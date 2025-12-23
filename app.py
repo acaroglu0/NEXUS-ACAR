@@ -13,7 +13,7 @@ st.set_page_config(
 
 # --- TASARIM ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>🦁 NEXUS INTELLIGENCE</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: grey;'>Canlı Piyasa & Yapay Zeka Analiz Üssü</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: grey;'>Canlı Kripto Veri & Yapay Zeka Analiz Üssü</h3>", unsafe_allow_html=True)
 st.divider()
 
 # --- API KEY ---
@@ -24,64 +24,64 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# --- AKILLI MODEL SEÇİCİ (TEST SÜRÜŞLÜ) ---
-# cache_resource: Bu işlemi bir kere yap, çalışan modeli hafızada tut.
-@st.cache_resource(show_spinner="Yapay zeka motorları test ediliyor...")
-def get_working_model():
+# --- AKILLI MODEL SEÇİCİ (TANK MODU) ---
+@st.cache_resource(show_spinner="Uygun yapay zeka motoru aranıyor...")
+def find_working_model():
     """
-    Modelleri sırayla dener. Sadece ismine bakmaz, 
-    gerçekten cevap veriyor mu diye test eder.
+    Google'ın tüm olası model isimlerini dener.
+    Gerçekten cevap vereni bulana kadar durmaz.
     """
-    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+    # Denenecekler listesi (En hızlıdan en eskiye)
+    models_to_test = [
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-pro",
+        "gemini-1.5-pro-latest",
+        "gemini-1.5-pro-001",
+        "gemini-pro",
+        "gemini-1.0-pro"
+    ]
     
-    for model_name in models_to_try:
+    logs = []
+    
+    for model_name in models_to_test:
         try:
             model = genai.GenerativeModel(model_name)
-            # GİZLİ TEST: Modele boş bir sinyal gönder
-            model.generate_content("test")
-            # Hata vermediyse bu model çalışıyor demektir!
-            return model_name 
-        except:
-            # Hata verdiyse sonrakine geç
+            # GERÇEK TEST: Modele 'Merhaba' de, cevap veriyor mu bak.
+            response = model.generate_content("test")
+            if response:
+                return model_name, logs # Çalışanı bulduk!
+        except Exception as e:
+            logs.append(f"❌ {model_name} başarısız oldu.")
             continue
             
-    # Hiçbiri çalışmazsa en eskisini döndür (Son çare)
-    return "gemini-pro"
+    # Hiçbiri çalışmazsa (Çok düşük ihtimal)
+    return None, logs
 
-# Çalışan modeli hafızadan çağır
-active_model_name = get_working_model()
-model = genai.GenerativeModel(active_model_name)
+# En başta modeli bul
+active_model_name, debug_logs = find_working_model()
 
-# --- VERİ ÇEKME (HAFIZALI / CACHED) ---
+# --- VERİ ÇEKME FONKSİYONLARI ---
 @st.cache_data(ttl=120, show_spinner=False)
 def get_coin_data(query):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
+    headers = {"User-Agent": "Mozilla/5.0"}
     query = query.strip().lower()
     try:
-        # 1. ARAMA
-        search_url = f"https://api.coingecko.com/api/v3/search?query={query}"
-        r = requests.get(search_url, headers=headers)
+        r = requests.get(f"https://api.coingecko.com/api/v3/search?query={query}", headers=headers)
         data = r.json()
         if not data.get("coins"): return None
-            
         coin = data["coins"][0]
-        coin_id = coin["id"]
-        symbol = coin["symbol"].upper()
-        name = coin["name"]
         
-        # 2. FİYAT
-        price_url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
-        r_price = requests.get(price_url, headers=headers)
+        r_price = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={coin['id']}&vs_currencies=usd&include_24hr_change=true", headers=headers)
         p_data = r_price.json()
         
-        if coin_id in p_data:
+        if coin['id'] in p_data:
             return {
-                "name": name, 
-                "symbol": symbol, 
-                "price": p_data[coin_id]["usd"], 
-                "change": p_data[coin_id]["usd_24h_change"]
+                "name": coin["name"], 
+                "symbol": coin["symbol"].upper(), 
+                "price": p_data[coin['id']]["usd"], 
+                "change": p_data[coin['id']]["usd_24h_change"]
             }
         return None
     except:
@@ -90,88 +90,72 @@ def get_coin_data(query):
 @st.cache_data(ttl=300, show_spinner=False)
 def get_news():
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get("https://cointelegraph.com/rss", headers=headers)
+        r = requests.get("https://cointelegraph.com/rss", headers={"User-Agent": "Mozilla/5.0"})
         root = ET.fromstring(r.content)
-        news = []
-        for item in root.findall(".//item")[:5]:
-            title = item.find("title").text
-            link = item.find("link").text
-            news.append(f"- [{title}]({link})")
-        return "\n".join(news)
+        return "\n".join([f"- [{i.find('title').text}]({i.find('link').text})" for i in root.findall(".//item")[:5]])
     except:
-        return "Haberler şu an alınamıyor."
+        return "Haber kaynağına ulaşılamadı."
 
-# --- ARAYÜZ ---
+# --- YAN MENÜ ---
 with st.sidebar:
-    st.header("⚙️ Kontrol Paneli")
+    st.header("⚙️ Sistem Durumu")
     
-    # Kullanıcıya aktif modeli gösterelim ki için rahat olsun
-    st.success(f"✅ Aktif Motor: {active_model_name}")
+    if active_model_name:
+        st.success(f"✅ Bağlı Motor: **{active_model_name}**")
+    else:
+        st.error("🚨 Hiçbir model çalışmadı!")
+        with st.expander("Hata Günlüğü"):
+            for log in debug_logs:
+                st.write(log)
     
+    st.markdown("---")
     with st.form(key='search_form'):
-        coin_input = st.text_input("🪙 Coin Ara (Örn: sol, avax):", "BTC")
+        coin_input = st.text_input("🪙 Coin Ara:", "BTC")
         submit_button = st.form_submit_button(label='Verileri Getir')
-        
     mode = st.selectbox("Analiz Tipi:", ["Genel Bakış", "Fiyat Tahmini", "Risk Analizi"])
-    st.caption("ℹ️ Veriler önbelleğe alınır, sistem hızlı çalışır.")
 
 # --- ANA EKRAN ---
 col1, col2 = st.columns([1, 2])
-
 coin_data = None
-if coin_input:
-    coin_data = get_coin_data(coin_input)
+if coin_input: coin_data = get_coin_data(coin_input)
 
 with col1:
     st.subheader("📡 Piyasa Durumu")
-    
     if coin_data:
-        p = coin_data['price']
-        c = coin_data['change']
-        st.metric(label=f"{coin_data['name']} ({coin_data['symbol']})", value=f"${p:,.2f}", delta=f"%{c:.2f}")
+        st.metric(f"{coin_data['name']} ({coin_data['symbol']})", f"${coin_data['price']:,.2f}", f"%{coin_data['change']:.2f}")
     elif submit_button:
-        st.warning("Veri bulunamadı, lütfen tekrar deneyin.")
-
+        st.warning("Veri bekleniyor...")
+    
     st.write("---")
     
     if st.button("ANALİZİ BAŞLAT 🚀", type="primary", use_container_width=True):
-        if coin_data:
-            with st.spinner("NEXUS analiz yapıyor..."):
+        if not active_model_name:
+            st.error("Sistem çalışır durumda bir yapay zeka motoru bulamadı.")
+        elif coin_data:
+            with st.spinner(f"NEXUS ({active_model_name}) analiz yapıyor..."):
                 try:
+                    model = genai.GenerativeModel(active_model_name)
                     news = get_news()
-                    # Modeli yukarıda zaten seçtik ve test ettik, direkt kullanıyoruz.
-                    
                     prompt = f"""
                     Sen NEXUS. Kripto uzmanısın.
-                    
-                    ANALİZ EDİLECEK COIN: {coin_data['name']} ({coin_data['symbol']})
+                    COIN: {coin_data['name']} ({coin_data['symbol']})
                     FİYAT: ${coin_data['price']}
-                    DEĞİŞİM (24s): %{coin_data['change']:.2f}
-                    
-                    SON HABERLER:
-                    {news}
-                    
-                    KULLANICI İSTEĞİ: {mode}
-                    
-                    Yatırımcıya samimi, net ve veriye dayalı bir analiz yap.
-                    Başlıklar kullan, emojiler ekle. Yasal uyarıyı unutma.
+                    DEĞİŞİM: %{coin_data['change']:.2f}
+                    HABERLER: {news}
+                    İSTEK: {mode}.
+                    Yatırım tavsiyesi olmadan, samimi ve teknik bir yorum yap. Türkçe olsun.
                     """
-                    
                     res = model.generate_content(prompt)
                     st.session_state['res'] = res.text
                 except Exception as e:
-                    st.error(f"Beklenmedik bir hata: {e}")
+                    st.error(f"Motor Hatası: {e}")
         else:
-            st.error("Lütfen geçerli bir coin verisi çekin.")
+            st.error("Önce geçerli bir coin verisi çekin.")
 
 with col2:
-    st.subheader("📝 NEXUS Raporu")
+    st.subheader("📝 Rapor")
     box = st.container(border=True)
     if 'res' in st.session_state:
         box.markdown(st.session_state['res'])
     else:
         box.info("Analiz bekleniyor...")
-
-st.markdown("---")
-st.caption("⚠️ **Yasal Uyarı:** Veriler CoinGecko ve Cointelegraph'tan sağlanır. Yatırım tavsiyesi değildir.")
