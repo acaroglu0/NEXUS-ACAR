@@ -25,7 +25,7 @@ generation_config = {
     "max_output_tokens": 8192,
 }
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro-latest",
+    model_name="gemini-1.5-flasht",
     generation_config=generation_config,
 )
 
@@ -72,4 +72,5 @@ with col2:
 # Alt Bilgi
 st.divider()
 st.caption("⚠️ Yasal Uyarı: Bu bir yatırım tavsiyesi değildir. Yapay zeka çıktıları hata içerebilir.")
+
 
