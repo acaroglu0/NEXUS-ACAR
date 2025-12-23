@@ -8,89 +8,94 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- TASARIM VE BAŞLIK ---
+# --- BAŞLIK ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>🦁 NEXUS INTELLIGENCE</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: grey;'>Yapay Zeka Destekli Kripto Analiz Üssü</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: grey;'>Otomatik Model Algılayıcı Sistem</h3>", unsafe_allow_html=True)
 st.divider()
 
 # --- API KEY KONTROLÜ ---
-try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
-except Exception as e:
+api_key = st.secrets.get("GEMINI_API_KEY")
+if not api_key:
     st.error("🚨 HATA: API Anahtarı bulunamadı! Lütfen Streamlit 'Secrets' ayarlarını kontrol edin.")
     st.stop()
 
-# --- MODEL AYARLARI (Flash Modeli - En Hızlısı) ---
-generation_config = {
-    "temperature": 0.7,
-    "top_p": 0.95,
-    "top_k": 40,
-    "max_output_tokens": 8192,
-}
+genai.configure(api_key=api_key)
 
-try:
-    # Google ismini güncelledi, en güvenli güncel isim bu:
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
-        generation_config=generation_config,
-    )
-except Exception as e:
-    st.error(f"Model yüklenirken hata: {e}")
+# --- AKILLI MODEL SEÇİCİ (BU KISIM YENİ) ---
+# Modelleri tek tek deneyeceğiz, hangisi çalışırsa onu kapacağız.
+def get_working_model():
+    available_models = []
+    try:
+        # Google'a sor: Hangi modellerin var?
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                available_models.append(m.name)
+    except Exception as e:
+        return None, f"Bağlantı Hatası: {str(e)}"
+
+    # Tercih sıramız: Önce Flash, olmazsa Pro, o da olmazsa herhangi biri.
+    priority_models = [
+        "models/gemini-1.5-flash", 
+        "models/gemini-1.5-pro", 
+        "models/gemini-pro"
+    ]
+    
+    # Listeden eşleşen ilkini bul
+    for priority in priority_models:
+        if priority in available_models:
+            return priority, None
+            
+    # Eğer öncelikliler yoksa, çalışan ilk modeli ver
+    if available_models:
+        return available_models[0], None
+        
+    return None, "Hiçbir uygun model bulunamadı."
+
+# Modeli Belirle
+model_name, error_msg = get_working_model()
+
+if error_msg:
+    st.error(f"🚨 SİSTEM HATASI: {error_msg}")
+    st.warning("İpucu: API Key'iniz geçerli mi? Google AI Studio'dan yeni bir key almayı deneyin.")
+    st.stop()
+else:
+    # Model Başarıyla Seçildi
+    try:
+        model = genai.GenerativeModel(model_name)
+        st.success(f"✅ Sistem Bağlandı! Aktif Motor: **{model_name}**")
+    except Exception as e:
+        st.error(f"Model yüklenirken hata: {e}")
 
 # --- YAN MENÜ ---
 with st.sidebar:
-    st.title("⚙️ Kontrol Paneli")
-    st.markdown("---")
+    st.header("⚙️ Kontrol Paneli")
     coin_name = st.text_input("🪙 Kripto Para:", "Bitcoin (BTC)")
     analysis_type = st.selectbox("🔍 Analiz Modu:", 
-        ["Genel Piyasa Yorumu", "Fiyat Tahmini (Senaryolu)", "Risk Analizi", "Son Dakika Haber Özeti", "Yatırımcı Psikolojisi"]
+        ["Genel Piyasa Yorumu", "Fiyat Tahmini", "Risk Analizi"]
     )
-    st.markdown("---")
-    st.info("💡 **NEXUS**, Gemini 1.5 Flash motorunu kullanarak piyasayı saniyeler içinde tarar.")
 
 # --- ANA EKRAN ---
 col1, col2 = st.columns([1, 2])
 
 with col1:
     st.subheader("📡 Sinyal Gönder")
-    st.write(f"**Hedef:** {coin_name}")
-    st.write(f"**Mod:** {analysis_type}")
-    
     if st.button("ANALİZİ BAŞLAT 🚀", type="primary", use_container_width=True):
-        with st.spinner("NEXUS verileri işliyor, yapay zeka düşünüyor..."):
+        with st.spinner(f"{model_name} motoru çalışıyor..."):
             try:
-                # Prompt (Yapay Zeka İstemi)
                 prompt = f"""
-                Sen NEXUS adında, dünya çapında ünlü, zeki ve hafif esprili bir kripto para uzmanısın.
-                Kullanıcı senden şu konuda analiz istedi:
+                Sen uzman bir kripto analistisin.
                 Coin: {coin_name}
                 Konu: {analysis_type}
-
-                Lütfen cevabını şu başlıklarla, Markdown formatında düzenle:
-                1. 🌍 **Piyasa Nabzı:** Durum ne? Boğa mı Ayı mı?
-                2. 📊 **Teknik Veriler:** Kritik destek/direnç noktaları neler olabilir? (Tahmini)
-                3. 🧠 **NEXUS Görüşü:** Yatırımcıya dostane, samimi ve net tavsiyeler ver. (Asla kesin 'al-sat' emri verme, yön göster).
-                
-                Bol emoji kullan, sıkıcı olma. Türkçe konuş.
+                Lütfen kısa, net ve yatırımcı dostu bir yorum yap.
                 """
-                
                 response = model.generate_content(prompt)
                 st.session_state['result'] = response.text
-                st.balloons() # Başarılı olunca balonlar çıksın!
-                st.success("Analiz Başarıyla Tamamlandı!")
-                
             except Exception as e:
                 st.error(f"Bir hata oluştu: {e}")
 
 with col2:
-    st.subheader("📝 Analiz Raporu")
-    container = st.container(border=True)
+    st.subheader("📝 Rapor")
     if 'result' in st.session_state:
-        container.markdown(st.session_state['result'])
+        st.markdown(st.session_state['result'])
     else:
-        container.info("Analiz sonuçları burada görüntülenecek. Sol taraftan başlatın.")
-
-# --- ALT BİLGİ ---
-st.markdown("---")
-st.caption("⚠️ **Yasal Uyarı:** Bu uygulama yapay zeka destekli eğitim ve bilgi amaçlıdır. Kesin yatırım tavsiyesi değildir.")
+        st.info("Analiz bekleniyor...")
