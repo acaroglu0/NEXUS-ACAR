@@ -10,12 +10,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- BAŞLIK ---
+# --- BAŞLIK VE LOGO ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>🦁 NEXUS INTELLIGENCE</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: grey;'>Canlı Kripto Veri & Yapay Zeka Analiz Üssü</h3>", unsafe_allow_html=True)
 st.divider()
 
-# --- API KEY ---
+# --- API KEY KONTROLÜ ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
@@ -23,10 +23,27 @@ except Exception as e:
     st.error("🚨 API Key Hatası! Lütfen Secrets ayarlarını kontrol et.")
     st.stop()
 
-# --- MODEL TANIMLAMA (TEST YOK, DİREKT BAĞLANTI) ---
-# En güncel ve hızlı model. Hata verirse 'gemini-pro' deneyeceğiz (aşağıda).
-model_flash = genai.GenerativeModel("gemini-1.5-flash")
-model_pro = genai.GenerativeModel("gemini-pro")
+# --- MODEL YÜKLEME FONKSİYONU (HATAYA DAYANIKLI) ---
+def get_response(prompt):
+    """
+    Bu fonksiyon önce en hızlı modeli (Flash) dener.
+    Hata alırsa en güvenilir modeli (Pro) dener.
+    O da olmazsa hatayı ekrana basar.
+    """
+    models_to_try = ["gemini-1.5-flash", "gemini-pro"]
+    
+    for model_name in models_to_try:
+        try:
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            return response.text # Başarılı olursa cevabı döndür ve çık
+        except Exception as e:
+            # Hata verirse (404 vs) devam et, sıradakini dene
+            print(f"{model_name} hata verdi: {e}")
+            continue
+            
+    # Döngü bitti ve hiçbiri çalışmadıysa:
+    return "HATA: Maalesef Google yapay zeka servislerine şu an ulaşılamıyor. Lütfen daha sonra tekrar deneyin."
 
 # --- VERİ ÇEKME FONKSİYONLARI ---
 @st.cache_data(ttl=120, show_spinner=False)
@@ -70,7 +87,7 @@ with st.sidebar:
         submit_button = st.form_submit_button(label='Verileri Getir')
     
     mode = st.selectbox("Analiz Tipi:", ["Genel Bakış", "Fiyat Tahmini", "Risk Analizi"])
-    st.info("Sistem Gemini 1.5 Flash motorunu kullanır.")
+    st.info("Sistem otomatik olarak en hızlı çalışan modeli seçer.")
 
 # --- ANA EKRAN ---
 col1, col2 = st.columns([1, 2])
@@ -84,7 +101,7 @@ with col1:
     if coin_data:
         st.metric(f"{coin_data['name']} ({coin_data['symbol']})", f"${coin_data['price']:,.2f}", f"%{coin_data['change']:.2f}")
     elif submit_button:
-        st.warning("Veri bekleniyor...")
+        st.warning("Veri bekleniyor... (CoinGecko yanıt vermezse 30sn bekleyin)")
     
     st.write("---")
     
@@ -102,17 +119,9 @@ with col1:
                 Yatırım tavsiyesi verme. Samimi ve teknik konuş.
                 """
                 
-                # --- KRİTİK NOKTA: Önce Flash'ı dene, olmazsa Pro'yu dene ---
-                try:
-                    response = model_flash.generate_content(prompt)
-                    st.session_state['res'] = response.text
-                except Exception as e_flash:
-                    # Flash hata verirse Pro'yu dene
-                    try:
-                        response = model_pro.generate_content(prompt)
-                        st.session_state['res'] = response.text
-                    except Exception as e_pro:
-                        st.error(f"Maalesef iki model de cevap vermedi. Hata: {e_flash}")
+                # Fonksiyonu çağır ve sonucu al
+                result_text = get_response(prompt)
+                st.session_state['res'] = result_text
 
         else:
             st.error("Önce geçerli bir coin verisi lazım.")
