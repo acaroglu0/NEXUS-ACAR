@@ -1,7 +1,7 @@
 import streamlit as st
-import google.generativeai as genai
 import requests
 import xml.etree.ElementTree as ET
+import json
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(
@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- BAŞLIK VE LOGO ---
+# --- BAŞLIK ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>🦁 NEXUS INTELLIGENCE</h1>", unsafe_allow_html=True)
 st.markdown("<h3 style='text-align: center; color: grey;'>Canlı Kripto Veri & Yapay Zeka Analiz Üssü</h3>", unsafe_allow_html=True)
 st.divider()
@@ -18,32 +18,37 @@ st.divider()
 # --- API KEY KONTROLÜ ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
 except Exception as e:
     st.error("🚨 API Key Hatası! Lütfen Secrets ayarlarını kontrol et.")
     st.stop()
 
-# --- MODEL YÜKLEME FONKSİYONU (HATAYA DAYANIKLI) ---
-def get_response(prompt):
+# --- YENİ NESİL: DİREKT API BAĞLANTISI (Kütüphanesiz) ---
+def ask_gemini_directly(prompt):
     """
-    Bu fonksiyon önce en hızlı modeli (Flash) dener.
-    Hata alırsa en güvenilir modeli (Pro) dener.
-    O da olmazsa hatayı ekrana basar.
+    Bu fonksiyon aracı kütüphaneyi kullanmaz. 
+    Direkt olarak Google sunucularına bağlanır.
     """
-    models_to_try = ["gemini-1.5-flash", "gemini-pro"]
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }]
+    }
     
-    for model_name in models_to_try:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            return response.text # Başarılı olursa cevabı döndür ve çık
-        except Exception as e:
-            # Hata verirse (404 vs) devam et, sıradakini dene
-            print(f"{model_name} hata verdi: {e}")
-            continue
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        
+        if response.status_code == 200:
+            # Başarılı cevap geldiyse içinden metni çıkar
+            return response.json()['candidates'][0]['content']['parts'][0]['text']
+        else:
+            # Hata varsa (404, 400 vs) detayını göster
+            error_msg = response.text
+            return f"⚠️ Google Sunucu Hatası ({response.status_code}): {error_msg}"
             
-    # Döngü bitti ve hiçbiri çalışmadıysa:
-    return "HATA: Maalesef Google yapay zeka servislerine şu an ulaşılamıyor. Lütfen daha sonra tekrar deneyin."
+    except Exception as e:
+        return f"⚠️ Bağlantı Hatası: {str(e)}"
 
 # --- VERİ ÇEKME FONKSİYONLARI ---
 @st.cache_data(ttl=120, show_spinner=False)
@@ -87,7 +92,7 @@ with st.sidebar:
         submit_button = st.form_submit_button(label='Verileri Getir')
     
     mode = st.selectbox("Analiz Tipi:", ["Genel Bakış", "Fiyat Tahmini", "Risk Analizi"])
-    st.info("Sistem otomatik olarak en hızlı çalışan modeli seçer.")
+    st.info("Sistem 'Direkt Bağlantı Modu' ile çalışıyor.")
 
 # --- ANA EKRAN ---
 col1, col2 = st.columns([1, 2])
@@ -107,7 +112,7 @@ with col1:
     
     if st.button("ANALİZİ BAŞLAT 🚀", type="primary", use_container_width=True):
         if coin_data:
-            with st.spinner("NEXUS analiz yapıyor..."):
+            with st.spinner("NEXUS, Google sunucularına bağlanıyor..."):
                 news = get_news()
                 prompt = f"""
                 Sen NEXUS. Kripto uzmanısın.
@@ -119,8 +124,8 @@ with col1:
                 Yatırım tavsiyesi verme. Samimi ve teknik konuş.
                 """
                 
-                # Fonksiyonu çağır ve sonucu al
-                result_text = get_response(prompt)
+                # --- YENİ FONKSİYONU ÇAĞIRIYORUZ ---
+                result_text = ask_gemini_directly(prompt)
                 st.session_state['res'] = result_text
 
         else:
@@ -130,6 +135,10 @@ with col2:
     st.subheader("📝 Rapor")
     box = st.container(border=True)
     if 'res' in st.session_state:
-        box.markdown(st.session_state['res'])
+        # Hata mesajı mı yoksa gerçek cevap mı kontrol et
+        if "⚠️" in st.session_state['res']:
+            st.error(st.session_state['res'])
+        else:
+            box.markdown(st.session_state['res'])
     else:
         box.info("Analiz bekleniyor...")
