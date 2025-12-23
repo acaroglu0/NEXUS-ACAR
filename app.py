@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import requests
 import xml.etree.ElementTree as ET
+import time
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(
@@ -10,122 +11,158 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- TASARIM VE BAŞLIK ---
+# --- TASARIM ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>🦁 NEXUS INTELLIGENCE</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: grey;'>Canlı Kripto Veri & Yapay Zeka Analiz Üssü</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: grey;'>Canlı Piyasa & Yapay Zeka Analizi</h3>", unsafe_allow_html=True)
 st.divider()
 
-# --- API KEY KONTROLÜ ---
+# --- API KEY ---
 api_key = st.secrets.get("GEMINI_API_KEY")
 if not api_key:
-    st.error("🚨 HATA: API Anahtarı bulunamadı! Lütfen Streamlit 'Secrets' ayarlarını kontrol edin.")
+    st.error("🚨 HATA: API Anahtarı bulunamadı!")
     st.stop()
 
 genai.configure(api_key=api_key)
 
-# --- AKILLI MODEL SEÇİCİ ---
-def get_working_model():
-    # Öncelikli olarak Flash modelini dene (Hız için)
-    priority_models = ["models/gemini-1.5-flash", "models/gemini-pro"]
-    for model_name in priority_models:
+# --- MODEL SEÇİCİ ---
+def get_model():
+    # Model isimlerini sırayla dene
+    models = ["models/gemini-1.5-flash", "models/gemini-pro"]
+    for m in models:
         try:
-            return genai.GenerativeModel(model_name)
+            return genai.GenerativeModel(m)
         except:
             continue
-    # Hiçbiri olmazsa varsayılanı döndür
     return genai.GenerativeModel("gemini-1.5-flash")
 
-# --- VERİ ÇEKME FONKSİYONLARI ---
-def get_coin_price(coin_name):
-    """CoinGecko'dan canlı fiyat çeker"""
+# --- GÜÇLENDİRİLMİŞ VERİ ÇEKME (HEADERS EKLENDİ) ---
+def get_coin_data(query):
+    """CoinGecko'dan veri çekerken tarayıcı gibi davranır"""
+    # Bu başlıklar sayesinde robot sanılmayacağız
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    
     try:
-        search_url = f"https://api.coingecko.com/api/v3/search?query={coin_name}"
-        search_response = requests.get(search_url).json()
+        # 1. ARAMA YAP (eth -> ethereum bul)
+        search_url = f"https://api.coingecko.com/api/v3/search?query={query}"
+        r = requests.get(search_url, headers=headers)
+        data = r.json()
         
-        if not search_response.get("coins"):
-            return None, None, None
-
-        coin_id = search_response["coins"][0]["id"]
-        coin_symbol = search_response["coins"][0]["symbol"].upper()
+        if not data.get("coins"):
+            return None
+            
+        # İlk eşleşen coini al
+        coin = data["coins"][0]
+        coin_id = coin["id"]
+        symbol = coin["symbol"].upper()
+        name = coin["name"]
         
+        # 2. FİYAT ÇEK
         price_url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
-        price_data = requests.get(price_url).json()
+        r_price = requests.get(price_url, headers=headers)
+        p_data = r_price.json()
         
-        if coin_id in price_data:
-            return price_data[coin_id]["usd"], price_data[coin_id]["usd_24h_change"], coin_symbol
-        return None, None, None
-    except:
-        return None, None, None
+        if coin_id in p_data:
+            return {
+                "name": name,
+                "symbol": symbol,
+                "price": p_data[coin_id]["usd"],
+                "change": p_data[coin_id]["usd_24h_change"]
+            }
+        return None
+        
+    except Exception as e:
+        # Hata olursa sessizce None dön
+        return None
 
-def get_crypto_news():
-    """Cointelegraph'tan haber başlıklarını çeker"""
+def get_news():
+    """Haberleri çeker"""
     try:
-        response = requests.get("https://cointelegraph.com/rss")
-        root = ET.fromstring(response.content)
-        news = [f"- [{item.find('title').text}]({item.find('link').text})" for item in root.findall(".//item")[:5]]
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get("https://cointelegraph.com/rss", headers=headers)
+        root = ET.fromstring(r.content)
+        news = []
+        for item in root.findall(".//item")[:5]:
+            title = item.find("title").text
+            link = item.find("link").text
+            news.append(f"- [{title}]({link})")
         return "\n".join(news)
     except:
-        return "Haber kaynağına ulaşılamadı."
+        return "Haberler şu an alınamıyor."
 
-# --- YAN MENÜ ---
+# --- ARAYÜZ ---
 with st.sidebar:
     st.header("⚙️ Kontrol Paneli")
-    coin_input = st.text_input("🪙 Coin Ara:", "Bitcoin")
-    analysis_type = st.selectbox("🔍 Analiz Modu:", ["Genel Piyasa Yorumu", "Fiyat Tahmini", "Risk Analizi"])
-    st.info("💡 NEXUS canlı verilerle çalışır.")
+    coin_input = st.text_input("🪙 Coin Ara (Örn: eth, avax):", "BTC")
+    mode = st.selectbox("Analiz Tipi:", ["Genel Bakış", "Fiyat Tahmini", "Risk Analizi"])
+    
+    st.info("💡 İpucu: Kısaltma yazabilirsin (btc, eth, sol...)")
 
 # --- ANA EKRAN ---
 col1, col2 = st.columns([1, 2])
 
+# Veriyi Çek
+coin_data = None
+if coin_input:
+    coin_data = get_coin_data(coin_input)
+
 with col1:
-    st.subheader("📡 Canlı Veriler")
-    price, change, symbol = get_coin_price(coin_input)
+    st.subheader("📡 Piyasa Durumu")
     
-    if price:
-        color = "green" if change > 0 else "red"
-        st.metric(label=f"{symbol} Fiyatı", value=f"${price:,.2f}", delta=f"%{change:.2f}")
+    if coin_data:
+        p = coin_data['price']
+        c = coin_data['change']
+        color = "normal"
+        if c > 0: color = "normal" # Streamlit metric rengi otomatik ayarlar
+        
+        st.metric(
+            label=f"{coin_data['name']} ({coin_data['symbol']})", 
+            value=f"${p:,.2f}", 
+            delta=f"%{c:.2f}"
+        )
     else:
-        st.warning("Coin bulunamadı.")
+        st.warning(f"'{coin_input}' bulunamadı. Tam ismini deneyin.")
 
     st.write("---")
     
     if st.button("ANALİZİ BAŞLAT 🚀", type="primary", use_container_width=True):
-        if price:
-            with st.spinner("NEXUS piyasayı tarıyor..."):
+        if coin_data:
+            with st.spinner("NEXUS verileri işliyor..."):
                 try:
-                    news_text = get_crypto_news()
-                    model = get_working_model()
+                    news = get_news()
+                    model = get_model()
                     
                     prompt = f"""
-                    Sen NEXUS, usta bir kripto analistisin.
+                    Sen NEXUS. Kripto uzmanısın.
                     
-                    CANLI VERİLER:
-                    - Coin: {symbol}
-                    - Fiyat: ${price}
-                    - Değişim (24s): %{change:.2f}
+                    ANALİZ EDİLECEK COIN: {coin_data['name']} ({coin_data['symbol']})
+                    FİYAT: ${coin_data['price']}
+                    DEĞİŞİM (24s): %{coin_data['change']:.2f}
                     
-                    HABERLER:
-                    {news_text}
+                    SON HABERLER:
+                    {news}
                     
-                    İSTEK: {analysis_type} yap.
-                    Yatırımcıya kısa, net ve samimi bir analiz sun.
+                    KULLANICI İSTEĞİ: {mode}
+                    
+                    Yatırımcıya samimi, net ve veriye dayalı bir analiz yap.
+                    Başlıklar kullan, emojiler ekle. Yasal uyarıyı unutma.
                     """
                     
-                    response = model.generate_content(prompt)
-                    st.session_state['result'] = response.text
+                    res = model.generate_content(prompt)
+                    st.session_state['res'] = res.text
                 except Exception as e:
                     st.error(f"Hata: {e}")
         else:
-            st.error("Lütfen geçerli bir coin girin.")
+            st.error("Önce geçerli bir coin bulunmalı.")
 
 with col2:
     st.subheader("📝 NEXUS Raporu")
-    container = st.container(border=True)
-    if 'result' in st.session_state:
-        container.markdown(st.session_state['result'])
+    box = st.container(border=True)
+    if 'res' in st.session_state:
+        box.markdown(st.session_state['res'])
     else:
-        container.info("Analiz bekleniyor... Sol taraftan başlatın.")
+        box.info("Sol taraftan analizi başlatın.")
 
-# --- ALT BİLGİ ---
 st.markdown("---")
-st.caption("⚠️ **Yasal Uyarı:** Veriler CoinGecko ve Cointelegraph üzerinden sağlanmaktadır. Yatırım tavsiyesi değildir.")
+st.caption("⚠️ **Yasal Uyarı:** Veriler CoinGecko ve Cointelegraph'tan sağlanır. Yatırım tavsiyesi değildir.")
