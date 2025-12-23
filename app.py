@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 
 # Sayfa Ayarları
-st.set_page_config(page_title="NEXUS INTELLIGENCE", page_icon="🦁", layout="wide")
+st.set_page_config(page_title="PİYASA TAHMİN", page_icon="🦁", layout="wide")
 
 # Başlık ve Logo
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>🦁 NEXUS INTELLIGENCE</h1>", unsafe_allow_html=True)
@@ -25,7 +25,7 @@ generation_config = {
     "max_output_tokens": 8192,
 }
 model = genai.GenerativeModel(
-    model_name="gemini-1.5-flasht",
+    model_name="gemini-1.5-flash",
     generation_config=generation_config,
 )
 
@@ -72,5 +72,6 @@ with col2:
 # Alt Bilgi
 st.divider()
 st.caption("⚠️ Yasal Uyarı: Bu bir yatırım tavsiyesi değildir. Yapay zeka çıktıları hata içerebilir.")
+
 
 
