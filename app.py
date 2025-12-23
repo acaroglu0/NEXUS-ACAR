@@ -1,78 +1,96 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Sayfa Ayarları
-st.set_page_config(page_title="PİYASA TAHMİN", page_icon="🦁", layout="wide")
+# --- SAYFA AYARLARI ---
+st.set_page_config(
+    page_title="NEXUS TERMINAL", 
+    page_icon="🦁", 
+    layout="wide"
+)
 
-# Başlık ve Logo
+# --- TASARIM VE BAŞLIK ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>🦁 NEXUS INTELLIGENCE</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center; color: grey;'>Yapay Zeka Destekli Kripto Analiz Terminali</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: grey;'>Yapay Zeka Destekli Kripto Analiz Üssü</h3>", unsafe_allow_html=True)
 st.divider()
 
-# API Key Kontrolü
+# --- API KEY KONTROLÜ ---
 try:
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
-except:
-    st.error("🚨 HATA: API Anahtarı bulunamadı! Lütfen Secrets ayarlarını kontrol edin.")
+except Exception as e:
+    st.error("🚨 HATA: API Anahtarı bulunamadı! Lütfen Streamlit 'Secrets' ayarlarını kontrol edin.")
     st.stop()
 
-# Model Ayarları
+# --- MODEL AYARLARI (Flash Modeli - En Hızlısı) ---
 generation_config = {
     "temperature": 0.7,
     "top_p": 0.95,
     "top_k": 40,
     "max_output_tokens": 8192,
 }
-model = genai.GenerativeModel(
-    model_name="gemini-pro",
-    generation_config=generation_config,
-)
 
-# Yan Menü
+try:
+    # Google ismini güncelledi, en güvenli güncel isim bu:
+    model = genai.GenerativeModel(
+        model_name="gemini-1.5-flash",
+        generation_config=generation_config,
+    )
+except Exception as e:
+    st.error(f"Model yüklenirken hata: {e}")
+
+# --- YAN MENÜ ---
 with st.sidebar:
-    st.header("⚙️ Kontrol Paneli")
-    coin_name = st.text_input("Kripto Para Adı:", "Bitcoin (BTC)")
-    analysis_type = st.selectbox("Analiz Türü:", ["Genel Piyasa Yorumu", "Fiyat Tahmini", "Risk Analizi", "Haber Özeti"])
-    st.info("NEXUS, en güncel piyasa verilerini ve haber akışlarını yapay zeka ile yorumlar.")
+    st.title("⚙️ Kontrol Paneli")
+    st.markdown("---")
+    coin_name = st.text_input("🪙 Kripto Para:", "Bitcoin (BTC)")
+    analysis_type = st.selectbox("🔍 Analiz Modu:", 
+        ["Genel Piyasa Yorumu", "Fiyat Tahmini (Senaryolu)", "Risk Analizi", "Son Dakika Haber Özeti", "Yatırımcı Psikolojisi"]
+    )
+    st.markdown("---")
+    st.info("💡 **NEXUS**, Gemini 1.5 Flash motorunu kullanarak piyasayı saniyeler içinde tarar.")
 
-# Ana Ekran
+# --- ANA EKRAN ---
 col1, col2 = st.columns([1, 2])
 
 with col1:
-    st.subheader("📊 Hızlı Bakış")
-    if st.button("ANALİZİ BAŞLAT 🚀", use_container_width=True):
-        with st.spinner("NEXUS verileri tarıyor..."):
+    st.subheader("📡 Sinyal Gönder")
+    st.write(f"**Hedef:** {coin_name}")
+    st.write(f"**Mod:** {analysis_type}")
+    
+    if st.button("ANALİZİ BAŞLAT 🚀", type="primary", use_container_width=True):
+        with st.spinner("NEXUS verileri işliyor, yapay zeka düşünüyor..."):
             try:
-                # Yapay Zeka İstemi
+                # Prompt (Yapay Zeka İstemi)
                 prompt = f"""
-                Sen uzman bir kripto para analistisin. Adın NEXUS.
-                Şu an '{coin_name}' coini için '{analysis_type}' yapmanı istiyorum.
+                Sen NEXUS adında, dünya çapında ünlü, zeki ve hafif esprili bir kripto para uzmanısın.
+                Kullanıcı senden şu konuda analiz istedi:
+                Coin: {coin_name}
+                Konu: {analysis_type}
+
+                Lütfen cevabını şu başlıklarla, Markdown formatında düzenle:
+                1. 🌍 **Piyasa Nabzı:** Durum ne? Boğa mı Ayı mı?
+                2. 📊 **Teknik Veriler:** Kritik destek/direnç noktaları neler olabilir? (Tahmini)
+                3. 🧠 **NEXUS Görüşü:** Yatırımcıya dostane, samimi ve net tavsiyeler ver. (Asla kesin 'al-sat' emri verme, yön göster).
                 
-                Lütfen şu formatta yanıt ver:
-                1. **Piyasa Durumu:** Kısa bir özet.
-                2. **Teknik Göstergeler:** Önemli noktalar.
-                3. **NEXUS Görüşü:** Yatırımcı dostu, samimi bir tavsiye (Asla kesin 'al/sat' deme).
-                
-                Yanıtın Türkçe, profesyonel ama anlaşılır olsun. Emojiler kullan.
+                Bol emoji kullan, sıkıcı olma. Türkçe konuş.
                 """
+                
                 response = model.generate_content(prompt)
                 st.session_state['result'] = response.text
-                st.success("Analiz Tamamlandı!")
+                st.balloons() # Başarılı olunca balonlar çıksın!
+                st.success("Analiz Başarıyla Tamamlandı!")
+                
             except Exception as e:
                 st.error(f"Bir hata oluştu: {e}")
 
 with col2:
-    st.subheader("📝 NEXUS Raporu")
+    st.subheader("📝 Analiz Raporu")
+    container = st.container(border=True)
     if 'result' in st.session_state:
-        st.markdown(st.session_state['result'])
+        container.markdown(st.session_state['result'])
     else:
-        st.info("Analiz sonucunu görmek için sol taraftan butona basınız.")
+        container.info("Analiz sonuçları burada görüntülenecek. Sol taraftan başlatın.")
 
-# Alt Bilgi
-st.divider()
-st.caption("⚠️ Yasal Uyarı: Bu bir yatırım tavsiyesi değildir. Yapay zeka çıktıları hata içerebilir.")
-
-
-
-
+# --- ALT BİLGİ ---
+st.markdown("---")
+st.caption("⚠️ **Yasal Uyarı:** Bu uygulama yapay zeka destekli eğitim ve bilgi amaçlıdır. Kesin yatırım tavsiyesi değildir.")
