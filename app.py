@@ -20,7 +20,7 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (BUTON VE DÜZEN AYARLARI) ---
+# --- 2. CSS (DÜZEN VE STİL) ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
@@ -41,17 +41,15 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
     
-    /* BUTON AYARLARI */
     div.stButton > button {{
         width: 100%;
         border-radius: 8px;
-        font-weight: 900 !important; /* DAHA KALIN (EXTRA BOLD) */
+        font-weight: 900 !important;
         font-size: 16px;
         transition: all 0.3s;
-        text-transform: uppercase; /* BÜYÜK HARF */
+        text-transform: uppercase;
     }}
     
-    /* ANALİZ BUTONU RENKLENDİRME */
     div.stButton > button[kind="primary"] {{
         background-color: {st.session_state.theme_color};
         color: black;
@@ -62,18 +60,22 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- API ---
+# --- API AYARLARI ---
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=api_key)
+    # Secrets dosyasından anahtarı almayı dene, yoksa boş geç (Hata vermesin, aşağıda uyarırız)
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
+    if api_key:
+        genai.configure(api_key=api_key)
 except:
-    st.error("API Key Hatası!")
-    st.stop()
+    pass # Hata olursa sessiz kal, butona basınca uyarı veririz
 
 @st.cache_resource
 def get_model():
-    try: return genai.GenerativeModel("gemini-1.5-flash")
-    except: return genai.GenerativeModel("gemini-pro")
+    # Önce Hızlı Modeli Dene, Olmazsa Pro'ya Geç
+    try:
+        return genai.GenerativeModel("gemini-1.5-flash")
+    except:
+        return genai.GenerativeModel("gemini-pro")
 
 @st.cache_data(ttl=60)
 def get_coin_data(coin_id, currency):
@@ -102,7 +104,7 @@ def get_news(coin_name):
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
     except: return []
 
-# --- 3. PRO GRAFİK MOTORU ---
+# --- GRAFİK MOTORU ---
 def create_mountain_chart(df_price, price_change):
     if price_change < 0:
         main_color = '#ea3943' 
@@ -121,33 +123,19 @@ def create_mountain_chart(df_price, price_change):
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
-        x=df_price['time'], 
-        y=df_price['price'],
-        mode='lines',
-        name='Fiyat',
+        x=df_price['time'], y=df_price['price'],
+        mode='lines', name='Fiyat',
         line=dict(color=main_color, width=3), 
-        fill='tozeroy', 
-        fillcolor=fill_color, 
+        fill='tozeroy', fillcolor=fill_color, 
         showlegend=False
     ))
 
     fig.update_layout(
-        height=600,
-        margin=dict(l=0, r=0, t=10, b=0),
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        hovermode='x unified',
-        dragmode='pan',
+        height=600, margin=dict(l=0, r=0, t=10, b=0),
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+        hovermode='x unified', dragmode='pan',
         xaxis=dict(showgrid=False, color='gray', gridcolor='rgba(128,128,128,0.1)'),
-        yaxis=dict(
-            side='right', 
-            visible=True, 
-            showgrid=True, 
-            gridcolor='rgba(128,128,128,0.1)', 
-            color='white',
-            range=[y_min, y_max], 
-            tickprefix=st.session_state.currency.upper() + " "
-        )
+        yaxis=dict(side='right', visible=True, showgrid=True, gridcolor='rgba(128,128,128,0.1)', color='white', range=[y_min, y_max], tickprefix=st.session_state.currency.upper() + " ")
     )
     return fig
 
@@ -159,33 +147,22 @@ with col_left:
     with st.container(border=True):
         st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
-        
         st.caption("🔍 **KRİPTO ARAMA**")
         coin_input = st.text_input("Coin Ara:", "bitcoin", label_visibility="collapsed")
-        
         st.markdown("<br>", unsafe_allow_html=True)
-        
         st.caption("🧠 **ANALİZ TÜRÜ**")
         analysis_type = st.selectbox("Seçiniz:", ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"], label_visibility="collapsed")
-        
-        # BUTON (ROKET YOK, KALIN FONT)
         analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
-        
         st.markdown("---")
-        
         st.caption("🌐 **PORTAL / MOD**")
         mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
         st.session_state.app_mode = mode_select
-        
         st.markdown("---")
-        
         if st.session_state.app_mode == "TERMINAL":
             st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
             days_api = "1" if day_opt == "24 Saat" else "7"
-            
             st.markdown("<br>", unsafe_allow_html=True)
-            
             st.caption("🌍 **DİL**")
             lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
             st.session_state.language = lng
@@ -202,15 +179,8 @@ with col_mid:
             trend_color = "#ea3943" if p_change < 0 else "#16c784"
             
             h1, h2 = st.columns([1, 1])
-            with h1:
-                st.markdown(f"<h1 style='font-size: 40px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
-            with h2:
-                st.markdown(f"""
-                <div style='text-align:right;'>
-                    <h1 style='margin:0; font-size: 40px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1>
-                    <h3 style='color: {trend_color}; margin:0;'>%{p_change:.2f}</h3>
-                </div>
-                """, unsafe_allow_html=True)
+            with h1: st.markdown(f"<h1 style='font-size: 40px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
+            with h2: st.markdown(f"<div style='text-align:right;'><h1 style='margin:0; font-size: 40px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1><h3 style='color: {trend_color}; margin:0;'>%{p_change:.2f}</h3></div>", unsafe_allow_html=True)
             
             df_price = get_chart_data(coin_id, st.session_state.currency, days_api)
             if not df_price.empty:
@@ -220,15 +190,24 @@ with col_mid:
             if analyze_btn:
                 st.markdown("---")
                 st.subheader(f"🤖 NEXUS AI: {analysis_type}")
-                with st.spinner("Analiz ediliyor..."):
-                    model = get_model()
-                    base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Durum: Son {day_opt}."
-                    lang_prompt = "Türkçe yanıtla." if st.session_state.language == 'TR' else "Answer in English."
-                    full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap."
-                    try:
-                        res = model.generate_content(full_prompt)
-                        st.info(res.text)
-                    except: st.error("Hata.")
+                
+                # --- HATA AYIKLAMA MODU ---
+                if not st.secrets.get("GEMINI_API_KEY"):
+                    st.error("⚠️ API Anahtarı Bulunamadı! Lütfen Streamlit ayarlarında 'GEMINI_API_KEY' tanımlayın.")
+                else:
+                    with st.spinner("Yapay zeka verileri yorumluyor..."):
+                        try:
+                            model = get_model()
+                            base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Durum: Son {day_opt}."
+                            lang_prompt = "Türkçe yanıtla." if st.session_state.language == 'TR' else "Answer in English."
+                            full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap. Yatırım tavsiyesi olmadığını belirt."
+                            
+                            res = model.generate_content(full_prompt)
+                            st.info(res.text)
+                        except Exception as e:
+                            # Hatanın gerçek sebebini ekrana yazdırıyoruz
+                            st.error(f"⚠️ Bağlantı Hatası: {str(e)}")
+                            st.caption("Çözüm: Sayfayı yenileyin veya API kotanızı kontrol edin.")
         else:
             st.warning("Veri bekleniyor...")
     else:
@@ -239,21 +218,13 @@ with col_mid:
 with col_right:
     with st.container(border=True):
         st.markdown("#### ⚙️ Ayarlar")
-        
-        # PARA BİRİMİ
-        st.caption("Para Birimi")
         curr = st.selectbox("Para Birimi", ["TRY", "USD", "EUR"], label_visibility="collapsed")
         st.session_state.currency = curr.lower()
-        
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        # TEMA (BAŞLIK YOK, AYARLARIN ALTINDA)
         st.caption("Tema Rengi")
         thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
         st.session_state.theme_color = THEMES[thm]
-        
         st.markdown("---")
-        
         target = coin_id if 'coin_id' in locals() else 'bitcoin'
         st.markdown(f"#### 📰 Haberler")
         news = get_news(target)
