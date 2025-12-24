@@ -21,17 +21,19 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (TASARIM İYİLEŞTİRMELERİ) ---
+# --- 2. CSS (ÖLÜ ALANLARI YOK ETME VE YAYILMA) ---
 st.markdown(f"""
 <style>
     /* Native Sidebar'ı Gizle */
     [data-testid="stSidebar"] {{display: none;}}
     
-    /* SCROLL FIX & EKRAN GENİŞLİĞİ */
+    /* EN ÖNEMLİ KISIM: EKRANIN KENARLARINA YAPIŞTIRMA */
     .block-container {{
-        padding-top: 3rem;
+        padding-top: 2rem;
         padding-bottom: 5rem;
-        max-width: 95% !important; /* Ekranın %95'ini kullan */
+        padding-left: 1rem;  /* Sol boşluğu azalttık */
+        padding-right: 1rem; /* Sağ boşluğu azalttık */
+        max-width: 100%;     /* Ekranın %100'ünü kullan */
     }}
     
     /* Panel Kutuları */
@@ -57,7 +59,7 @@ st.markdown(f"""
         color: black;
         border: none;
         margin-top: 5px;
-        margin-bottom: 15px; /* Altına biraz boşluk */
+        margin-bottom: 15px;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -109,25 +111,23 @@ def create_price_chart(df, theme_color):
         fill='tozeroy', fillcolor=f"rgba{tuple(int(theme_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4)) + (0.1,)}"
     ))
     fig.update_layout(
-        height=550, margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        height=600, margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(showgrid=False, visible=True, showticklabels=True, color='grey'),
         yaxis=dict(showgrid=True, gridcolor='rgba(128,128,128,0.1)', autorange=True, side='right'),
         font={'color': "white"}
     )
     return fig
 
-# --- EKRAN DÜZENİ (GENİŞ ORTA ALAN) ---
-# Sol (%15) - Orta (%70) - Sağ (%15) -> [1, 5, 1] Oranı
-col_left, col_mid, col_right = st.columns([1, 5, 1])
+# --- EKRAN DÜZENİ ---
+# BURASI ÖNEMLİ: [1, 3, 1] yaparak panellere biraz hacim verdik ama CSS ile kenarlara ittik.
+col_left, col_mid, col_right = st.columns([1, 3, 1])
 
-# --- 1. SOL PANEL (KONTROLLER) ---
+# --- 1. SOL PANEL ---
 with col_left:
     with st.container(border=True):
-        # BAŞLIK
         st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 28px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
-        # ARAMA & ANALİZ TÜRÜ
         st.caption("🔍 **KRİPTO ARAMA**")
         coin_input = st.text_input("Coin Ara:", "bitcoin", label_visibility="collapsed")
         
@@ -138,19 +138,17 @@ with col_left:
                                    ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"],
                                    label_visibility="collapsed")
         
-        # BUTON (YENİ YERİ: Hemen altında)
+        # BUTON (HEMEN ALTINDA)
         analyze_btn = st.button("ANALİZİ BAŞLAT 🚀", type="primary")
         
         st.markdown("---")
 
-        # PORTAL GEÇİŞİ
         st.caption("🌐 **PORTAL / MOD**")
         mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
         st.session_state.app_mode = mode_select
         
         st.markdown("---")
         
-        # SÜRE VE DİL (EN ALTTA)
         if st.session_state.app_mode == "TERMINAL":
             st.caption("⏳ **GRAFİK SÜRESİ**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
@@ -158,11 +156,12 @@ with col_left:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # DİL SEÇENEĞİ (EN ALTTA)
             st.caption("🌍 **DİL / LANGUAGE**")
             lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
             st.session_state.language = lng
 
-# --- 2. ORTA EKRAN (İÇERİK - ARTIK DAHA GENİŞ) ---
+# --- 2. ORTA EKRAN ---
 with col_mid:
     if st.session_state.app_mode == "TERMINAL":
         coin_id = coin_input.lower().strip()
@@ -171,17 +170,14 @@ with col_mid:
         if data:
             curr_sym = "₺" if st.session_state.currency == 'try' else "$" if st.session_state.currency == 'usd' else "€"
             
-            # Başlık ve Fiyat
             h1, h2 = st.columns([2, 1])
             h1.markdown(f"<h1 style='font-size: 56px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
             h2.markdown(f"<h1 style='text-align:right; color: {st.session_state.theme_color}; margin:0; font-size: 56px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1>", unsafe_allow_html=True)
             
-            # Grafik
             chart_df = get_chart_data(coin_id, st.session_state.currency, days_api)
             if not chart_df.empty:
                 st.plotly_chart(create_price_chart(chart_df, st.session_state.theme_color), use_container_width=True, config={'displayModeBar': False})
             
-            # AI Analizi
             if analyze_btn:
                 st.markdown("---")
                 st.subheader(f"🤖 NEXUS AI: {analysis_type}")
@@ -213,7 +209,7 @@ with col_mid:
         st.title("🌍 NEXUS PORTAL")
         st.info("Burası yakında küresel piyasa verileriyle dolacak.")
 
-# --- 3. SAĞ PANEL (SADECE AYARLAR VE HABERLER) ---
+# --- 3. SAĞ PANEL ---
 with col_right:
     with st.container(border=True):
         st.markdown("#### ⚙️ Ayarlar")
@@ -228,7 +224,6 @@ with col_right:
         
         st.markdown("---")
         
-        # Haberler
         target = coin_input.lower().strip() if 'coin_input' in locals() else 'bitcoin'
         st.markdown(f"#### 📰 {target.upper()} Haber")
         
