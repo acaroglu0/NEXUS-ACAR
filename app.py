@@ -21,24 +21,30 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (TAM EKRAN YERLEŞİM) ---
+# --- 2. CSS (DÜZEN VE BUG DÜZELTMELERİ) ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
+    
+    /* EKRANI TAM KAPLA VE BOŞLUKLARI SİL */
     .block-container {{
-        padding-top: 2rem;
-        padding-bottom: 5rem;
+        padding-top: 1rem;
+        padding-bottom: 0rem;
         padding-left: 1rem;
         padding-right: 1rem;
         max-width: 100%;
     }}
+    
+    /* PANELLER */
     .nexus-panel {{
         background-color: #1E1E1E;
         padding: 15px;
         border-radius: 12px;
         border: 1px solid #333;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }}
+    
+    /* BUTONLAR */
     div.stButton > button {{
         width: 100%;
         border-radius: 8px;
@@ -80,14 +86,10 @@ def get_chart_data(coin_id, currency, days):
     try:
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency={currency}&days={days}"
         data = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}).json()
-        
-        # Fiyatlar
         df_price = pd.DataFrame(data['prices'], columns=['time', 'price'])
         df_price['time'] = pd.to_datetime(df_price['time'], unit='ms')
-        
-        # Hacimler (Volume) - Grafik dolu görünsün diye çekiyoruz
         df_vol = pd.DataFrame(data['total_volumes'], columns=['time', 'volume'])
-        
+        df_vol['time'] = pd.to_datetime(df_vol['time'], unit='ms')
         return df_price, df_vol
     except: return pd.DataFrame(), pd.DataFrame()
 
@@ -101,83 +103,94 @@ def get_news(coin_name):
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
     except: return []
 
-# --- PRO GRAFİK MOTORU (YENİLENDİ) ---
-def create_professional_chart(df_price, df_vol, theme_color):
-    # Fiyatın düşüp yükseldiğini bulalım
-    start_price = df_price['price'].iloc[0]
-    end_price = df_price['price'].iloc[-1]
-    
-    # Eğer düşüşteyse Kırmızı, yükselişteyse Tema Rengi (veya Yeşil)
-    # Profesyonel görünüm için: Düşüş = Kırmızı, Yükseliş = Yeşil/Tema
-    line_color = "#FF3B30" if end_price < start_price else theme_color 
-    
-    # Alt Grafik (Hacim) ve Üst Grafik (Fiyat) oluştur
+# --- 3. PRO GRAFİK MOTORU (CMC STİLİ - DÜZELTİLMİŞ) ---
+def create_professional_chart(df_price, df_vol, price_change):
+    # Renk Belirleme (CMC Standartları)
+    # Düşüşteyse Kırmızı (#ea3943), Yükselişteyse Yeşil (#16c784)
+    if price_change < 0:
+        main_color = '#ea3943' # Kırmızı
+        fill_color = 'rgba(234, 57, 67, 0.2)' # Şeffaf Kırmızı
+    else:
+        main_color = '#16c784' # Yeşil
+        fill_color = 'rgba(22, 199, 132, 0.2)' # Şeffaf Yeşil
+
+    # İki eksenli grafik oluştur (Fiyat ve Hacim)
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    # 1. HACİM BARLARI (Arkada silik dursun)
+    # 1. HACİM (Volume) - En Altta Silik
     fig.add_trace(go.Bar(
-        x=df_vol['time'], y=df_vol['volume'],
-        marker_color=line_color,
-        opacity=0.1, # Çok silik
-        name='Hacim'
+        x=df_vol['time'], 
+        y=df_vol['volume'],
+        marker_color=main_color,
+        opacity=0.3, # Çok silik olsun ki fiyatı kapatmasın
+        name='Hacim',
+        showlegend=False
     ), secondary_y=True)
 
-    # 2. FİYAT ÇİZGİSİ (Önde parlak dursun)
+    # 2. FİYAT (Price) - Üstte Parlak
     fig.add_trace(go.Scatter(
-        x=df_price['time'], y=df_price['price'],
+        x=df_price['time'], 
+        y=df_price['price'],
         mode='lines',
         name='Fiyat',
-        line=dict(color=line_color, width=3),
+        line=dict(color=main_color, width=2),
         fill='tozeroy', # Altını doldur
-        # Gradient efekti için çok şeffaf boya
-        fillcolor=f"rgba{tuple(int(line_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4)) + (0.1,)}"
+        fillcolor=fill_color,
+        showlegend=False
     ), secondary_y=False)
 
-    # 3. GÖRSEL AYARLAR (CMC / TradingView Tarzı)
+    # 3. GRAFİK AYARLARI
+    
+    # Hacim barlarını aşağı bastırmak için Hacim Ekseninin (Y2) aralığını genişletiyoruz.
+    # Böylece barlar sadece grafiğin alt %20'sine sıkışıyor.
+    max_vol = df_vol['volume'].max()
+    fig.update_yaxes(range=[0, max_vol * 5], visible=False, secondary_y=True) # Hacim ekseni gizli
+
+    # Fiyat Ekseni (Sağda)
+    fig.update_yaxes(
+        side='right', 
+        visible=True, 
+        showgrid=True, 
+        gridcolor='rgba(128,128,128,0.1)', 
+        color='white',
+        tickprefix=st.session_state.currency.upper() + " ", # Para birimi sembolü
+        secondary_y=False
+    )
+
+    # X Ekseni (Zaman)
+    fig.update_xaxes(
+        showgrid=False, 
+        color='gray',
+        gridcolor='rgba(128,128,128,0.1)'
+    )
+
+    # Genel Düzen
     fig.update_layout(
         height=600,
-        margin=dict(l=0, r=0, t=20, b=0),
+        margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        hovermode='x unified', # Crosshair modu (İmleci takip eden çizgi)
-        showlegend=False,
-        
-        # X Ekseni (Zaman)
-        xaxis=dict(
-            showgrid=False, 
-            showline=False,
-            color='gray',
-            gridcolor='rgba(128,128,128,0.1)'
-        ),
-        
-        # Y Ekseni (Fiyat - SOLDA GİZLİ, SAĞDA AÇIK)
-        yaxis=dict(showgrid=True, gridcolor='rgba(128,128,128,0.1)', visible=False), # Sol ekseni gizle
-        yaxis2=dict(showgrid=False, visible=False) # Hacim eksenini gizle
+        hovermode='x unified', # İmleç takibi
+        dragmode='pan' # Kaydırma modu
     )
-    
-    # Fiyat Eksenini SAĞ TARAFA al (Profesyonel Standart)
-    fig.update_layout(yaxis=dict(side='right', visible=True, color='white', showgrid=True, gridcolor='rgba(128,128,128,0.1)'))
 
     return fig
 
 # --- EKRAN DÜZENİ ---
-col_left, col_mid, col_right = st.columns([1, 3, 1])
+col_left, col_mid, col_right = st.columns([1, 4, 1])
 
 # --- SOL PANEL ---
 with col_left:
     with st.container(border=True):
-        st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 28px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
+        st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
         st.caption("🔍 **KRİPTO ARAMA**")
         coin_input = st.text_input("Coin Ara:", "bitcoin", label_visibility="collapsed")
         
         st.markdown("<br>", unsafe_allow_html=True)
-
         st.caption("🧠 **ANALİZ TÜRÜ**")
-        analysis_type = st.selectbox("Seçiniz:", 
-                                   ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"],
-                                   label_visibility="collapsed")
+        analysis_type = st.selectbox("Seçiniz:", ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"], label_visibility="collapsed")
         
         analyze_btn = st.button("ANALİZİ BAŞLAT 🚀", type="primary")
         
@@ -187,9 +200,8 @@ with col_left:
         st.session_state.app_mode = mode_select
         
         st.markdown("---")
-        
         if st.session_state.app_mode == "TERMINAL":
-            st.caption("⏳ **GRAFİK SÜRESİ**")
+            st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
             days_api = "1" if day_opt == "24 Saat" else "7"
             
@@ -207,40 +219,43 @@ with col_mid:
         if data:
             curr_sym = "₺" if st.session_state.currency == 'try' else "$" if st.session_state.currency == 'usd' else "€"
             
-            # Başlık
-            h1, h2 = st.columns([2, 1])
-            h1.markdown(f"<h1 style='font-size: 56px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
-            
-            # Fiyat Renklendirmesi (Düşüyorsa Kırmızı)
+            # Fiyat Değişimine Göre Renk (Kırmızı veya Yeşil)
             p_change = data.get('usd_24h_change', 0)
-            p_color = "#FF3B30" if p_change < 0 else "#00FF41"
+            trend_color = "#ea3943" if p_change < 0 else "#16c784"
             
-            h2.markdown(f"""
-            <div style='text-align:right;'>
-                <h1 style='margin:0; font-size: 56px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1>
-                <h3 style='color: {p_color}; margin:0;'>%{p_change:.2f}</h3>
-            </div>
-            """, unsafe_allow_html=True)
+            # Başlık Bloğu
+            h1, h2 = st.columns([1, 1])
+            with h1:
+                st.markdown(f"<h1 style='font-size: 40px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
+            with h2:
+                st.markdown(f"""
+                <div style='text-align:right;'>
+                    <h1 style='margin:0; font-size: 40px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1>
+                    <h3 style='color: {trend_color}; margin:0;'>%{p_change:.2f}</h3>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # YENİ GRAFİK FONKSİYONU ÇAĞIRILIYOR
+            # GRAFİK ÇİZİMİ
             df_price, df_vol = get_chart_data(coin_id, st.session_state.currency, days_api)
             if not df_price.empty:
-                st.plotly_chart(create_professional_chart(df_price, df_vol, st.session_state.theme_color), use_container_width=True, config={'displayModeBar': False})
+                # Fiyat değişimini parametre olarak gönderiyoruz ki renk ona göre olsun
+                fig = create_professional_chart(df_price, df_vol, p_change)
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
             
             if analyze_btn:
                 st.markdown("---")
                 st.subheader(f"🤖 NEXUS AI: {analysis_type}")
-                with st.spinner("Yapay zeka verileri işliyor..."):
+                with st.spinner("Yapay zeka analiz ediyor..."):
                     model = get_model()
                     base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Durum: Son {day_opt} grafiği."
                     lang_prompt = "Türkçe ve profesyonel bir dille yanıtla." if st.session_state.language == 'TR' else "Answer in professional English."
-                    full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap."
+                    full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap. (Önemli seviyeleri belirt)"
                     try:
                         res = model.generate_content(full_prompt)
                         st.info(res.text)
                     except: st.error("Servis meşgul.")
         else:
-            st.warning("Veri bekleniyor...")
+            st.warning("Veri bekleniyor... (Doğru coin ismini girdiğinizden emin olun)")
     else:
         st.title("🌍 NEXUS PORTAL")
         st.info("Küresel veriler yükleniyor...")
@@ -249,19 +264,17 @@ with col_mid:
 with col_right:
     with st.container(border=True):
         st.markdown("#### ⚙️ Ayarlar")
-        
-        st.caption("Para Birimi")
         curr = st.selectbox("Para Birimi", ["TRY", "USD", "EUR"], label_visibility="collapsed")
         st.session_state.currency = curr.lower()
         
-        st.caption("Tema Rengi")
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 🎨 Tema")
         thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
         st.session_state.theme_color = THEMES[thm]
         
         st.markdown("---")
-        
-        target = coin_input.lower().strip() if 'coin_input' in locals() else 'bitcoin'
-        st.markdown(f"#### 📰 {target.upper()} Haber")
+        target = coin_id if 'coin_id' in locals() else 'bitcoin'
+        st.markdown(f"#### 📰 Haberler")
         news = get_news(target)
         if news:
             for n in news:
