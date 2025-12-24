@@ -3,7 +3,6 @@ import google.generativeai as genai
 import requests
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
@@ -82,10 +81,8 @@ def get_chart_data(coin_id, currency, days):
         data = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}).json()
         df_price = pd.DataFrame(data['prices'], columns=['time', 'price'])
         df_price['time'] = pd.to_datetime(df_price['time'], unit='ms')
-        df_vol = pd.DataFrame(data['total_volumes'], columns=['time', 'volume'])
-        df_vol['time'] = pd.to_datetime(df_vol['time'], unit='ms')
-        return df_price, df_vol
-    except: return pd.DataFrame(), pd.DataFrame()
+        return df_price
+    except: return pd.DataFrame()
 
 @st.cache_data(ttl=600)
 def get_news(coin_name):
@@ -97,71 +94,65 @@ def get_news(coin_name):
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
     except: return []
 
-# --- 3. PRO GRAFİK MOTORU (DÜZELTİLMİŞ VERSİYON) ---
-def create_professional_chart(df_price, df_vol, price_change):
-    # Düşüşte Kırmızı, Yükselişte Yeşil
+# --- 3. PRO GRAFİK MOTORU (SADECE ÇİZGİ VE DOLGU) ---
+def create_mountain_chart(df_price, price_change):
+    # Renk Belirleme (Düşüş Kırmızı, Yükseliş Yeşil)
     if price_change < 0:
         main_color = '#ea3943' # Kırmızı
-        fill_color = 'rgba(234, 57, 67, 0.1)' # Çok şeffaf kırmızı
+        fill_color = 'rgba(234, 57, 67, 0.2)' # Şeffaf Kırmızı
     else:
         main_color = '#16c784' # Yeşil
-        fill_color = 'rgba(22, 199, 132, 0.1)' # Çok şeffaf yeşil
+        fill_color = 'rgba(22, 199, 132, 0.2)' # Şeffaf Yeşil
 
-    # Çift Eksenli Grafik (Fiyat ve Hacim)
-    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    # Y-Ekseni Aralığını Hesapla (0'a inmemesi için)
+    # Fiyatın en düşüğü ve en yükseğini bulup %2 pay bırakıyoruz.
+    min_price = df_price['price'].min()
+    max_price = df_price['price'].max()
+    padding = (max_price - min_price) * 0.05 # %5 boşluk
+    
+    y_min = min_price - padding
+    y_max = max_price + padding
 
-    # 1. HACİM (Volume) - En Altta
-    fig.add_trace(go.Bar(
-        x=df_vol['time'], 
-        y=df_vol['volume'],
-        marker_color=main_color,
-        opacity=0.2, # Silik görünüm
-        name='Hacim',
-        showlegend=False
-    ), secondary_y=True)
+    fig = go.Figure()
 
-    # 2. FİYAT (Price) - Çizgi
+    # TEK ÇİZGİ VE DOLGU (MOUNTAIN CHART)
     fig.add_trace(go.Scatter(
         x=df_price['time'], 
         y=df_price['price'],
-        mode='lines', # Sadece çizgi (Area kapalı veya çok şeffaf)
+        mode='lines',
         name='Fiyat',
-        line=dict(color=main_color, width=2),
-        fill='tozeroy', 
-        fillcolor=fill_color, # Neredeyse şeffaf dolgu
+        line=dict(color=main_color, width=3), # Çizgi kalınlığı
+        fill='tozeroy', # Altını doldur
+        fillcolor=fill_color, # Şeffaf dolgu rengi
         showlegend=False
-    ), secondary_y=False)
+    ))
 
-    # --- KRİTİK AYAR: HACMİ AŞAĞI BASMAK ---
-    # Hacim ekseninin (Y2) tavanını, gerçek hacmin 5 katı yapıyoruz.
-    # Bu sayede çubuklar grafiğin sadece alt %20'sinde kalıyor.
-    max_vol = df_vol['volume'].max()
-    fig.update_yaxes(range=[0, max_vol * 5], visible=False, secondary_y=True)
-
-    # Fiyat Ekseni (Sağda)
-    fig.update_yaxes(
-        side='right', 
-        visible=True, 
-        showgrid=True, 
-        gridcolor='rgba(128,128,128,0.1)', 
-        color='white',
-        secondary_y=False
-    )
-
-    # X Ekseni (Zaman)
-    fig.update_xaxes(
-        showgrid=False, 
-        color='gray',
-        gridcolor='rgba(128,128,128,0.1)'
-    )
-
+    # EKSEN AYARLARI (0'ı YOK ETMEK İÇİN)
     fig.update_layout(
         height=600,
         margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         hovermode='x unified',
-        dragmode='pan'
+        dragmode='pan',
+        
+        # X EKSENİ
+        xaxis=dict(
+            showgrid=False, 
+            color='gray',
+            gridcolor='rgba(128,128,128,0.1)'
+        ),
+        
+        # Y EKSENİ (SAĞDA VE ZOOM YAPILMIŞ)
+        yaxis=dict(
+            side='right', 
+            visible=True, 
+            showgrid=True, 
+            gridcolor='rgba(128,128,128,0.1)', 
+            color='white',
+            range=[y_min, y_max], # <-- İŞTE SİHİR BURADA: 0'a inmesine izin vermiyoruz
+            tickprefix=st.session_state.currency.upper() + " "
+        )
     )
 
     return fig
@@ -216,10 +207,10 @@ with col_mid:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # GRAFİK
-            df_price, df_vol = get_chart_data(coin_id, st.session_state.currency, days_api)
+            # GRAFİK (HACİM YOK, SADECE ÇİZGİ)
+            df_price = get_chart_data(coin_id, st.session_state.currency, days_api)
             if not df_price.empty:
-                fig = create_professional_chart(df_price, df_vol, p_change)
+                fig = create_mountain_chart(df_price, p_change)
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
             
             if analyze_btn:
