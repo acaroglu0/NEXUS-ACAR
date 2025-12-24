@@ -20,7 +20,7 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (TASARIM) ---
+# --- 2. CSS (DÜZEN VE STİL) ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
@@ -69,7 +69,17 @@ except: pass
 
 @st.cache_resource
 def get_model():
-    # DÜZELTME: Flash yerine en stabil model olan gemini-pro kullanıyoruz.
+    # AKILLI MODEL SEÇİCİ (OTOMATİK BULUR)
+    try:
+        # Hesabındaki kullanılabilir modelleri listele
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                if 'gemini' in m.name:
+                    return genai.GenerativeModel(m.name)
+    except:
+        pass
+    
+    # Bulamazsa standart olana dön
     return genai.GenerativeModel("gemini-pro")
 
 @st.cache_data(ttl=60)
@@ -187,20 +197,21 @@ with col_mid:
                 st.subheader(f"🤖 NEXUS AI: {analysis_type}")
                 
                 if not st.secrets.get("GEMINI_API_KEY"):
-                    st.error("⚠️ API Anahtarı Bulunamadı!")
+                    st.error("⚠️ API Anahtarı Eksik! 'Manage app' -> 'Secrets' kısmına ekleyin.")
                 else:
-                    with st.spinner("Yapay zeka verileri yorumluyor..."):
+                    with st.spinner("Analiz ediliyor... (Bu işlem birkaç saniye sürebilir)"):
                         try:
-                            # Model fixlendi: gemini-pro
+                            # Akıllı Model Seçiciyi Çağır
                             model = get_model()
                             base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Durum: Son {day_opt}."
                             lang_prompt = "Türkçe yanıtla." if st.session_state.language == 'TR' else "Answer in English."
-                            full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap. Yatırım tavsiyesi değildir uyarısı ekle."
+                            full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap."
                             
                             res = model.generate_content(full_prompt)
                             st.info(res.text)
                         except Exception as e:
                             st.error(f"Hata: {str(e)}")
+                            st.caption("Lütfen 'requirements.txt' dosyasını güncellediğinizden emin olun.")
         else:
             st.warning("Veri bekleniyor...")
     else:
