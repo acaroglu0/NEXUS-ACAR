@@ -21,15 +21,15 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS İLE TASARIM (BUG DÜZELTME VE GÜZELLEŞTİRME) ---
+# --- 2. CSS (BUG FIX & TASARIM) ---
 st.markdown(f"""
 <style>
     /* Native Sidebar'ı Gizle */
     [data-testid="stSidebar"] {{display: none;}}
     
-    /* Genel Arka Plan Ayarı (Scroll Bug Fix) */
+    /* SCROLL BUG FIX: Tepeye geniş boşluk verdik, artık yukarı çıkılabilecek */
     .block-container {{
-        padding-top: 1rem;
+        padding-top: 5rem;
         padding-bottom: 5rem;
     }}
     
@@ -50,11 +50,12 @@ st.markdown(f"""
         transition: all 0.3s;
     }}
     
-    /* Analiz Butonu Rengi */
+    /* Analiz Butonu */
     div.stButton > button[kind="primary"] {{
         background-color: {st.session_state.theme_color};
         color: black;
         border: none;
+        margin-top: 10px;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -114,38 +115,44 @@ def create_price_chart(df, theme_color):
     return fig
 
 # --- EKRAN DÜZENİ (3 SÜTUN) ---
-# Sol (%20) - Orta (%60) - Sağ (%20)
 col_left, col_mid, col_right = st.columns([1, 3, 1])
 
-# --- 1. SOL PANEL (KONTROLLER) ---
+# --- 1. SOL PANEL (KONTROLLER - SENİN İSTEDİĞİN SIRALAMA) ---
 with col_left:
     with st.container(border=True):
-        # Logo ve Başlık
+        # 1. BAŞLIK
         st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center; color: grey; font-size: 12px;'>INTELLIGENCE TERMINAL</p>", unsafe_allow_html=True)
         st.markdown("---")
         
-        # MOD SEÇİMİ (Büyük Butonlar)
-        mode_select = st.radio("MOD SEÇİMİ", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
+        # 2. KRİPTO ARAMA
+        st.caption("🔍 **KRİPTO ARAMA**")
+        coin_input = st.text_input("Coin Ara:", "bitcoin", label_visibility="collapsed")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 3. ANALİZ TÜRÜ
+        st.caption("🧠 **ANALİZ TÜRÜ**")
+        analysis_type = st.selectbox("Seçiniz:", 
+                                   ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"],
+                                   label_visibility="collapsed")
+        
+        st.markdown("---")
+
+        # 4. PORTAL GEÇİŞİ
+        st.caption("🌐 **PORTAL / MOD**")
+        # Segmented Control (Büyük Buton Görünümü)
+        mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
         st.session_state.app_mode = mode_select
         
         st.markdown("---")
         
+        # 5. GRAFİK SÜRESİ VE BUTON (EN ALTTA)
         if st.session_state.app_mode == "TERMINAL":
-            st.caption("🔍 **KRİPTO ARAMA**")
-            coin_input = st.text_input("Coin Ara:", "bitcoin")
-            
             st.caption("⏳ **GRAFİK SÜRESİ**")
-            # Sadece 1 Gün ve 7 Gün
-            day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True)
+            day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
             days_api = "1" if day_opt == "24 Saat" else "7"
             
-            st.caption("🧠 **ANALİZ TÜRÜ**")
-            # 3 Seçenekli Analiz
-            analysis_type = st.selectbox("Analiz Tipi:", 
-                                       ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"])
-            
-            st.markdown("<br>", unsafe_allow_html=True)
+            # BUTON
             analyze_btn = st.button("ANALİZİ BAŞLAT 🚀", type="primary")
 
 # --- 2. ORTA EKRAN (İÇERİK) ---
@@ -221,7 +228,7 @@ with col_right:
         
         st.markdown("---")
         
-        # Haberler (Favoriler kaldırıldı)
+        # Haberler
         target = coin_input.lower().strip() if 'coin_input' in locals() else 'bitcoin'
         st.markdown(f"#### 📰 {target.upper()} Haberleri")
         
