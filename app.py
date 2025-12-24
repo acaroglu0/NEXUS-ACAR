@@ -20,10 +20,11 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (TAM EKRAN YERLEŞİM) ---
+# --- 2. CSS (BUTON VE DÜZEN AYARLARI) ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
+    
     .block-container {{
         padding-top: 2rem;
         padding-bottom: 0rem;
@@ -31,6 +32,7 @@ st.markdown(f"""
         padding-right: 1rem;
         max-width: 100%;
     }}
+    
     .nexus-panel {{
         background-color: #1E1E1E;
         padding: 15px;
@@ -38,12 +40,18 @@ st.markdown(f"""
         border: 1px solid #333;
         margin-bottom: 10px;
     }}
+    
+    /* BUTON AYARLARI */
     div.stButton > button {{
         width: 100%;
         border-radius: 8px;
-        font-weight: bold;
+        font-weight: 900 !important; /* DAHA KALIN (EXTRA BOLD) */
+        font-size: 16px;
         transition: all 0.3s;
+        text-transform: uppercase; /* BÜYÜK HARF */
     }}
+    
+    /* ANALİZ BUTONU RENKLENDİRME */
     div.stButton > button[kind="primary"] {{
         background-color: {st.session_state.theme_color};
         color: black;
@@ -94,40 +102,35 @@ def get_news(coin_name):
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
     except: return []
 
-# --- 3. PRO GRAFİK MOTORU (SADECE ÇİZGİ VE DOLGU) ---
+# --- 3. PRO GRAFİK MOTORU ---
 def create_mountain_chart(df_price, price_change):
-    # Renk Belirleme (Düşüş Kırmızı, Yükseliş Yeşil)
     if price_change < 0:
-        main_color = '#ea3943' # Kırmızı
-        fill_color = 'rgba(234, 57, 67, 0.2)' # Şeffaf Kırmızı
+        main_color = '#ea3943' 
+        fill_color = 'rgba(234, 57, 67, 0.2)' 
     else:
-        main_color = '#16c784' # Yeşil
-        fill_color = 'rgba(22, 199, 132, 0.2)' # Şeffaf Yeşil
+        main_color = '#16c784' 
+        fill_color = 'rgba(22, 199, 132, 0.2)' 
 
-    # Y-Ekseni Aralığını Hesapla (0'a inmemesi için)
-    # Fiyatın en düşüğü ve en yükseğini bulup %2 pay bırakıyoruz.
     min_price = df_price['price'].min()
     max_price = df_price['price'].max()
-    padding = (max_price - min_price) * 0.05 # %5 boşluk
+    padding = (max_price - min_price) * 0.05 
     
     y_min = min_price - padding
     y_max = max_price + padding
 
     fig = go.Figure()
 
-    # TEK ÇİZGİ VE DOLGU (MOUNTAIN CHART)
     fig.add_trace(go.Scatter(
         x=df_price['time'], 
         y=df_price['price'],
         mode='lines',
         name='Fiyat',
-        line=dict(color=main_color, width=3), # Çizgi kalınlığı
-        fill='tozeroy', # Altını doldur
-        fillcolor=fill_color, # Şeffaf dolgu rengi
+        line=dict(color=main_color, width=3), 
+        fill='tozeroy', 
+        fillcolor=fill_color, 
         showlegend=False
     ))
 
-    # EKSEN AYARLARI (0'ı YOK ETMEK İÇİN)
     fig.update_layout(
         height=600,
         margin=dict(l=0, r=0, t=10, b=0),
@@ -135,26 +138,17 @@ def create_mountain_chart(df_price, price_change):
         plot_bgcolor='rgba(0,0,0,0)',
         hovermode='x unified',
         dragmode='pan',
-        
-        # X EKSENİ
-        xaxis=dict(
-            showgrid=False, 
-            color='gray',
-            gridcolor='rgba(128,128,128,0.1)'
-        ),
-        
-        # Y EKSENİ (SAĞDA VE ZOOM YAPILMIŞ)
+        xaxis=dict(showgrid=False, color='gray', gridcolor='rgba(128,128,128,0.1)'),
         yaxis=dict(
             side='right', 
             visible=True, 
             showgrid=True, 
             gridcolor='rgba(128,128,128,0.1)', 
             color='white',
-            range=[y_min, y_max], # <-- İŞTE SİHİR BURADA: 0'a inmesine izin vermiyoruz
+            range=[y_min, y_max], 
             tickprefix=st.session_state.currency.upper() + " "
         )
     )
-
     return fig
 
 # --- EKRAN DÜZENİ ---
@@ -165,22 +159,33 @@ with col_left:
     with st.container(border=True):
         st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
+        
         st.caption("🔍 **KRİPTO ARAMA**")
         coin_input = st.text_input("Coin Ara:", "bitcoin", label_visibility="collapsed")
+        
         st.markdown("<br>", unsafe_allow_html=True)
+        
         st.caption("🧠 **ANALİZ TÜRÜ**")
         analysis_type = st.selectbox("Seçiniz:", ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"], label_visibility="collapsed")
-        analyze_btn = st.button("ANALİZİ BAŞLAT 🚀", type="primary")
+        
+        # BUTON (ROKET YOK, KALIN FONT)
+        analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
+        
         st.markdown("---")
+        
         st.caption("🌐 **PORTAL / MOD**")
         mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
         st.session_state.app_mode = mode_select
+        
         st.markdown("---")
+        
         if st.session_state.app_mode == "TERMINAL":
             st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
             days_api = "1" if day_opt == "24 Saat" else "7"
+            
             st.markdown("<br>", unsafe_allow_html=True)
+            
             st.caption("🌍 **DİL**")
             lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
             st.session_state.language = lng
@@ -207,7 +212,6 @@ with col_mid:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # GRAFİK (HACİM YOK, SADECE ÇİZGİ)
             df_price = get_chart_data(coin_id, st.session_state.currency, days_api)
             if not df_price.empty:
                 fig = create_mountain_chart(df_price, p_change)
@@ -235,13 +239,21 @@ with col_mid:
 with col_right:
     with st.container(border=True):
         st.markdown("#### ⚙️ Ayarlar")
+        
+        # PARA BİRİMİ
+        st.caption("Para Birimi")
         curr = st.selectbox("Para Birimi", ["TRY", "USD", "EUR"], label_visibility="collapsed")
         st.session_state.currency = curr.lower()
+        
         st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 🎨 Tema")
+        
+        # TEMA (BAŞLIK YOK, AYARLARIN ALTINDA)
+        st.caption("Tema Rengi")
         thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
         st.session_state.theme_color = THEMES[thm]
+        
         st.markdown("---")
+        
         target = coin_id if 'coin_id' in locals() else 'bitcoin'
         st.markdown(f"#### 📰 Haberler")
         news = get_news(target)
