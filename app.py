@@ -3,6 +3,7 @@ import google.generativeai as genai
 import requests
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
@@ -20,7 +21,7 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (DÜZEN VE STİL) ---
+# --- 2. CSS (KOKPİT DÜZENİ) ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
@@ -39,6 +40,20 @@ st.markdown(f"""
         border-radius: 12px;
         border: 1px solid #333;
         margin-bottom: 10px;
+    }}
+    
+    /* İSTATİSTİK KUTULARI (MARKET CAP İÇİN) */
+    .stat-box {{
+        background-color: #151515;
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
     }}
     
     div.stButton > button {{
@@ -69,23 +84,20 @@ except: pass
 
 @st.cache_resource
 def get_model():
-    # AKILLI MODEL SEÇİCİ (OTOMATİK BULUR)
+    # Akıllı Model Seçici
     try:
-        # Hesabındaki kullanılabilir modelleri listele
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
                 if 'gemini' in m.name:
                     return genai.GenerativeModel(m.name)
-    except:
-        pass
-    
-    # Bulamazsa standart olana dön
+    except: pass
     return genai.GenerativeModel("gemini-pro")
 
 @st.cache_data(ttl=60)
 def get_coin_data(coin_id, currency):
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}&include_24hr_change=true"
+        # Market Cap verisini de çekmek için include_market_cap=true ekledik
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}&include_24hr_change=true&include_market_cap=true"
         return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}).json()[coin_id]
     except: return None
 
@@ -109,7 +121,9 @@ def get_news(coin_name):
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
     except: return []
 
-# --- GRAFİK MOTORU ---
+# --- GRAFİK MOTORLARI ---
+
+# 1. ÜST GRAFİK (SIRADAĞ - İNCE UZUN)
 def create_mountain_chart(df_price, price_change):
     if price_change < 0:
         main_color = '#ea3943' 
@@ -121,27 +135,54 @@ def create_mountain_chart(df_price, price_change):
     min_price = df_price['price'].min()
     max_price = df_price['price'].max()
     padding = (max_price - min_price) * 0.05 
-    
     y_min = min_price - padding
     y_max = max_price + padding
 
     fig = go.Figure()
-
     fig.add_trace(go.Scatter(
         x=df_price['time'], y=df_price['price'],
         mode='lines', name='Fiyat',
-        line=dict(color=main_color, width=3), 
+        line=dict(color=main_color, width=2), 
         fill='tozeroy', fillcolor=fill_color, 
         showlegend=False
     ))
-
     fig.update_layout(
-        height=600, margin=dict(l=0, r=0, t=10, b=0),
+        height=400, # İnce Uzun Dikdörtgen
+        margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
         hovermode='x unified', dragmode='pan',
         xaxis=dict(showgrid=False, color='gray', gridcolor='rgba(128,128,128,0.1)'),
         yaxis=dict(side='right', visible=True, showgrid=True, gridcolor='rgba(128,128,128,0.1)', color='white', range=[y_min, y_max], tickprefix=st.session_state.currency.upper() + " ")
     )
+    return fig
+
+# 2. SOL ALT (RİSK GÖSTERGESİ / İBRE)
+def create_gauge_chart(value):
+    # Değeri 0-100 arasına normalize et (Basit bir mantık: Değişim +50)
+    # Eğer %10 artarsa ibre 70'e, %10 düşerse 30'a gider.
+    score = max(0, min(100, 50 + (value * 2)))
+    
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = score,
+        title = {'text': "Piyasa İştahı / Risk", 'font': {'size': 14, 'color': "gray"}},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+            'bar': {'color': "rgba(0,0,0,0)"}, # İbreyi gizle, sadece threshold kalsın
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 0,
+            'steps': [
+                {'range': [0, 30], 'color': '#ea3943'},   # Kırmızı (Korku/Düşüş)
+                {'range': [30, 70], 'color': '#F7931A'},  # Turuncu (Nötr)
+                {'range': [70, 100], 'color': '#16c784'}], # Yeşil (Açgözlülük/Yükseliş)
+            'threshold': {
+                'line': {'color': "white", 'width': 4},
+                'thickness': 0.75,
+                'value': score
+            }
+        }
+    ))
+    fig.update_layout(height=250, margin=dict(l=20, r=20, t=30, b=10), paper_bgcolor='rgba(0,0,0,0)')
     return fig
 
 # --- EKRAN DÜZENİ ---
@@ -172,7 +213,7 @@ with col_left:
             lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
             st.session_state.language = lng
 
-# ORTA EKRAN
+# ORTA EKRAN (KOKPİT)
 with col_mid:
     if st.session_state.app_mode == "TERMINAL":
         coin_id = coin_input.lower().strip()
@@ -181,37 +222,56 @@ with col_mid:
         if data:
             curr_sym = "₺" if st.session_state.currency == 'try' else "$" if st.session_state.currency == 'usd' else "€"
             p_change = data.get('usd_24h_change', 0)
+            m_cap = data.get(f'{st.session_state.currency}_market_cap', 0)
             trend_color = "#ea3943" if p_change < 0 else "#16c784"
             
+            # ÜST: BAŞLIK VE FİYAT
             h1, h2 = st.columns([1, 1])
             with h1: st.markdown(f"<h1 style='font-size: 40px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
             with h2: st.markdown(f"<div style='text-align:right;'><h1 style='margin:0; font-size: 40px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1><h3 style='color: {trend_color}; margin:0;'>%{p_change:.2f}</h3></div>", unsafe_allow_html=True)
             
+            # ORTA 1: GRAFİK (İNCE UZUN DİKDÖRTGEN)
             df_price = get_chart_data(coin_id, st.session_state.currency, days_api)
             if not df_price.empty:
                 fig = create_mountain_chart(df_price, p_change)
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
             
+            # ORTA 2: ALT BÖLÜM (RİSK ve MARKET CAP)
+            c_bottom_1, c_bottom_2 = st.columns(2)
+            
+            with c_bottom_1:
+                # SOL ALT: RİSK İBRESİ
+                st.plotly_chart(create_gauge_chart(p_change), use_container_width=True, config={'displayModeBar': False})
+            
+            with c_bottom_2:
+                # SAĞ ALT: MARKET CAP (KARE KUTU)
+                st.markdown(f"""
+                <div class="stat-box">
+                    <h3 style="color: gray; margin: 0; font-size: 16px;">MARKET CAP (PİYASA DEĞERİ)</h3>
+                    <h1 style="color: white; margin: 10px 0; font-size: 32px;">{curr_sym}{m_cap:,.0f}</h1>
+                    <p style="color: {st.session_state.theme_color}; margin:0; font-size: 12px;">Anlık Kripto Para Değeri</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # AI ANALİZ SONUÇ ALANI
             if analyze_btn:
                 st.markdown("---")
                 st.subheader(f"🤖 NEXUS AI: {analysis_type}")
                 
                 if not st.secrets.get("GEMINI_API_KEY"):
-                    st.error("⚠️ API Anahtarı Eksik! 'Manage app' -> 'Secrets' kısmına ekleyin.")
+                    st.error("⚠️ API Anahtarı Eksik!")
                 else:
-                    with st.spinner("Analiz ediliyor... (Bu işlem birkaç saniye sürebilir)"):
+                    with st.spinner("Yapay zeka verileri yorumluyor..."):
                         try:
-                            # Akıllı Model Seçiciyi Çağır
                             model = get_model()
-                            base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Durum: Son {day_opt}."
+                            base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Market Cap: {m_cap}. Durum: Son {day_opt}."
                             lang_prompt = "Türkçe yanıtla." if st.session_state.language == 'TR' else "Answer in English."
-                            full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap."
+                            full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap. Risk durumunu ve Market Cap büyüklüğünü de yorumla."
                             
                             res = model.generate_content(full_prompt)
                             st.info(res.text)
                         except Exception as e:
                             st.error(f"Hata: {str(e)}")
-                            st.caption("Lütfen 'requirements.txt' dosyasını güncellediğinizden emin olun.")
         else:
             st.warning("Veri bekleniyor...")
     else:
