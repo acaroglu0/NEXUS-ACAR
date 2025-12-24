@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # --- 1. AYARLAR ---
-# Native Sidebar'ı "collapsed" (kapalı) başlatıyoruz ki bizimkiler öne çıksın
+# Native Sidebar'ı tamamen gizliyoruz (collapsed)
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
 
 # Session State
@@ -21,20 +21,27 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS İLE PANEL GÖRÜNÜMÜ ---
-# Sol ve Sağ sütunların arka planını "Sidebar Grisi" (#262730) yapıyoruz
+# --- 2. CSS İLE NATIVE SIDEBAR'I YOK ETME VE YENİ DÜZEN ---
 st.markdown("""
 <style>
-    /* Sol menü çubuğunu tamamen gizle */
+    /* Orijinal Sol Menüyü Tamamen Yok Et */
     [data-testid="stSidebar"] {display: none;}
+    section[data-testid="stSidebar"] {display: none;}
     
-    /* Panel Kutuları (Sol ve Sağ için) */
-    .nexus-panel {
-        background-color: #262730;
-        padding: 20px;
-        border-radius: 10px;
+    /* Üst boşluğu al, ekranı tam kapla */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* Sol ve Sağ Sütunları Sidebar Gibi Göster */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #262730; /* Sidebar Grisi */
         border: 1px solid #444;
-        height: 100%;
+        border-radius: 10px;
+        padding: 15px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -86,82 +93,90 @@ def create_price_chart(df, theme_color):
         fill='tozeroy', fillcolor=f"rgba{tuple(int(theme_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4)) + (0.1,)}"
     ))
     fig.update_layout(
-        height=500, margin=dict(l=0, r=0, t=10, b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        height=550, margin=dict(l=0, r=0, t=10, b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(showgrid=False, visible=True, showticklabels=True, color='grey'),
         yaxis=dict(showgrid=True, gridcolor='rgba(128,128,128,0.1)', autorange=True, side='right'),
         font={'color': "white"}
     )
     return fig
 
-# --- ANA EKRAN DÜZENİ (3 SÜTUNLU DASHBOARD) ---
+# --- EKRAN DÜZENİ (3 EŞİT PARÇALI MİMARİ) ---
 
-# Sütun Oranları: [1 Sol] - [3.5 Orta] - [1 Sağ]
-col_left, col_mid, col_right = st.columns([1, 3.5, 1])
+# Sol (%20) - Orta (%60) - Sağ (%20)
+# Bu oranlar sol ve sağ menünün eşit genişlikte olmasını sağlar
+col_left_sidebar, col_main_content, col_right_sidebar = st.columns([1, 3, 1])
 
-# --- 1. SOL SÜTUN (KONTROL PANELİ) ---
-with col_left:
-    # Kendi Panelimizi Oluşturuyoruz
-    with st.container(border=True): # border=True ile gri kutu içine alıyoruz
-        st.markdown(f"<h2 style='color: {st.session_state.theme_color}; text-align: center;'>🦁 NEXUS</h2>", unsafe_allow_html=True)
+# --- 1. SOL "CUSTOM" SIDEBAR ---
+with col_left_sidebar:
+    with st.container(border=True):
+        st.markdown(f"<h2 style='color: {st.session_state.theme_color}; text-align: center; margin-top:0;'>🦁 NEXUS</h2>", unsafe_allow_html=True)
         st.markdown("---")
         
         st.caption("ANALİZ KOKPİTİ")
         coin_input = st.text_input("Kripto Ara:", "bitcoin")
-        days_select = st.selectbox("Zaman Aralığı:", ["1", "7", "30", "90"], index=1)
+        days_select = st.selectbox("Grafik:", ["1", "7", "30", "90"], index=1)
         analyze_btn = st.button("ANALİZİ BAŞLAT 🚀", type="primary", use_container_width=True)
         
         st.markdown("---")
-        st.info("💡 **İpucu:** Sol menü ile sağ menü artık simetriktir.")
+        st.caption("PORTAL GEÇİŞİ")
+        # Basit bir mod değiştirici (Sayfa yenileme gerektirmez)
+        mode = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
 
 
-# --- 2. ORTA SÜTUN (GRAFİK VE ANALİZ) ---
-with col_mid:
-    # Veri İşlemleri
-    coin_id = st.session_state.get('selected_coin', coin_input.lower().strip())
-    data = get_coin_data(coin_id, st.session_state.currency)
-    
-    if data:
-        curr_sym = "₺" if st.session_state.currency == 'try' else "$" if st.session_state.currency == 'usd' else "€"
+# --- 2. ORTA ANA EKRAN ---
+with col_main_content:
+    if mode == "TERMINAL":
+        # Veri Çekme
+        coin_id = st.session_state.get('selected_coin', coin_input.lower().strip())
+        data = get_coin_data(coin_id, st.session_state.currency)
         
-        # Başlıklar
-        h_c1, h_c2 = st.columns([3, 1])
-        h_c1.markdown(f"<h1 style='color: {st.session_state.theme_color}; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
-        h_c2.markdown(f"<h2 style='margin:0; text-align:right;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h2>", unsafe_allow_html=True)
-
-        # Grafik
-        chart_df = get_chart_data(coin_id, st.session_state.currency, days_select)
-        if not chart_df.empty:
-            st.plotly_chart(create_price_chart(chart_df, st.session_state.theme_color), use_container_width=True, config={'displayModeBar': False})
-        
-        # Analiz Sonucu
-        if analyze_btn:
-            with st.spinner("NEXUS Hesaplıyor..."):
-                model = get_model()
-                prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Yorumla."
-                try:
-                    res = model.generate_content(prompt)
-                    st.info(res.text)
-                except: st.error("Servis meşgul.")
+        if data:
+            curr_sym = "₺" if st.session_state.currency == 'try' else "$" if st.session_state.currency == 'usd' else "€"
+            
+            # Başlık
+            h1, h2 = st.columns([3, 1])
+            h1.markdown(f"<h1 style='color: {st.session_state.theme_color}; margin:0; padding:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
+            h2.markdown(f"<h2 style='margin:0; text-align:right;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h2>", unsafe_allow_html=True)
+            
+            # Grafik
+            chart_df = get_chart_data(coin_id, st.session_state.currency, days_select)
+            if not chart_df.empty:
+                st.plotly_chart(create_price_chart(chart_df, st.session_state.theme_color), use_container_width=True, config={'displayModeBar': False})
+            
+            # AI Analizi
+            if analyze_btn:
+                with st.spinner("NEXUS Hesaplıyor..."):
+                    model = get_model()
+                    prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Yorumla."
+                    try:
+                        res = model.generate_content(prompt)
+                        st.info(res.text)
+                    except: st.error("Servis şu an meşgul.")
+        else:
+            st.warning("Veri bekleniyor... (Lütfen doğru coin ismi girin)")
+            
     else:
-        st.warning("Veri bekleniyor...")
+        # PORTAL MODU
+        st.title("Küresel Piyasa")
+        st.write("Top 10 Piyasa Değeri")
+        # (Portal kodları buraya gelecek, şimdilik basit tuttum)
 
-# --- 3. SAĞ SÜTUN (SOLUN KOPYASI) ---
-with col_right:
-    # Aynı 'container(border=True)' kullanarak Sol ile BİREBİR aynı görünümü veriyoruz
+# --- 3. SAĞ "CUSTOM" SIDEBAR ---
+with col_right_sidebar:
     with st.container(border=True):
         st.markdown("#### ⭐ Favoriler")
         
         def set_coin(c): st.session_state.selected_coin = c
         
-        c_f1, c_f2 = st.columns(2)
-        if c_f1.button("BTC", use_container_width=True): set_coin("bitcoin")
-        if c_f2.button("ETH", use_container_width=True): set_coin("ethereum")
+        cf1, cf2 = st.columns(2)
+        if cf1.button("BTC", key="b1", use_container_width=True): set_coin("bitcoin")
+        if cf2.button("ETH", key="b2", use_container_width=True): set_coin("ethereum")
         
-        c_f3, c_f4 = st.columns(2)
-        if c_f3.button("SOL", use_container_width=True): set_coin("solana")
-        if c_f4.button("AVAX", use_container_width=True): set_coin("avalanche-2")
+        cf3, cf4 = st.columns(2)
+        if cf3.button("SOL", key="b3", use_container_width=True): set_coin("solana")
+        if cf4.button("AVAX", key="b4", use_container_width=True): set_coin("avalanche-2")
         
-        if st.button("DOGE", use_container_width=True): set_coin("dogecoin")
+        if st.button("DOGE", key="b5", use_container_width=True): set_coin("dogecoin")
         
         st.markdown("---")
         st.markdown("#### ⚙️ Ayarlar")
@@ -178,7 +193,6 @@ with col_right:
         st.markdown("---")
         target = st.session_state.get('selected_coin', 'bitcoin')
         st.markdown(f"#### 📰 Haberler")
-        
         news = get_news(target)
         if news:
             for n in news:
