@@ -21,31 +21,32 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (BUG FIX & TASARIM) ---
+# --- 2. CSS (TASARIM İYİLEŞTİRMELERİ) ---
 st.markdown(f"""
 <style>
     /* Native Sidebar'ı Gizle */
     [data-testid="stSidebar"] {{display: none;}}
     
-    /* SCROLL BUG FIX: Tepeye geniş boşluk verdik, artık yukarı çıkılabilecek */
+    /* SCROLL FIX & EKRAN GENİŞLİĞİ */
     .block-container {{
-        padding-top: 5rem;
+        padding-top: 3rem;
         padding-bottom: 5rem;
+        max-width: 95% !important; /* Ekranın %95'ini kullan */
     }}
     
     /* Panel Kutuları */
     .nexus-panel {{
         background-color: #1E1E1E;
-        padding: 20px;
-        border-radius: 15px;
+        padding: 15px;
+        border-radius: 12px;
         border: 1px solid #333;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
     }}
     
-    /* Özel Butonlar */
+    /* Butonlar */
     div.stButton > button {{
         width: 100%;
-        border-radius: 10px;
+        border-radius: 8px;
         font-weight: bold;
         transition: all 0.3s;
     }}
@@ -55,7 +56,8 @@ st.markdown(f"""
         background-color: {st.session_state.theme_color};
         color: black;
         border: none;
-        margin-top: 10px;
+        margin-top: 5px;
+        margin-bottom: 15px; /* Altına biraz boşluk */
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -107,58 +109,62 @@ def create_price_chart(df, theme_color):
         fill='tozeroy', fillcolor=f"rgba{tuple(int(theme_color.lstrip('#')[i:i+2], 16) for i in (0, 2, 4)) + (0.1,)}"
     ))
     fig.update_layout(
-        height=500, margin=dict(l=0, r=0, t=20, b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        height=550, margin=dict(l=0, r=0, t=30, b=0), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(showgrid=False, visible=True, showticklabels=True, color='grey'),
         yaxis=dict(showgrid=True, gridcolor='rgba(128,128,128,0.1)', autorange=True, side='right'),
         font={'color': "white"}
     )
     return fig
 
-# --- EKRAN DÜZENİ (3 SÜTUN) ---
-col_left, col_mid, col_right = st.columns([1, 3, 1])
+# --- EKRAN DÜZENİ (GENİŞ ORTA ALAN) ---
+# Sol (%15) - Orta (%70) - Sağ (%15) -> [1, 5, 1] Oranı
+col_left, col_mid, col_right = st.columns([1, 5, 1])
 
-# --- 1. SOL PANEL (KONTROLLER - SENİN İSTEDİĞİN SIRALAMA) ---
+# --- 1. SOL PANEL (KONTROLLER) ---
 with col_left:
     with st.container(border=True):
-        # 1. BAŞLIK
-        st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
+        # BAŞLIK
+        st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 28px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
-        # 2. KRİPTO ARAMA
+        # ARAMA & ANALİZ TÜRÜ
         st.caption("🔍 **KRİPTO ARAMA**")
         coin_input = st.text_input("Coin Ara:", "bitcoin", label_visibility="collapsed")
         
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 3. ANALİZ TÜRÜ
         st.caption("🧠 **ANALİZ TÜRÜ**")
         analysis_type = st.selectbox("Seçiniz:", 
                                    ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"],
                                    label_visibility="collapsed")
         
+        # BUTON (YENİ YERİ: Hemen altında)
+        analyze_btn = st.button("ANALİZİ BAŞLAT 🚀", type="primary")
+        
         st.markdown("---")
 
-        # 4. PORTAL GEÇİŞİ
+        # PORTAL GEÇİŞİ
         st.caption("🌐 **PORTAL / MOD**")
-        # Segmented Control (Büyük Buton Görünümü)
         mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
         st.session_state.app_mode = mode_select
         
         st.markdown("---")
         
-        # 5. GRAFİK SÜRESİ VE BUTON (EN ALTTA)
+        # SÜRE VE DİL (EN ALTTA)
         if st.session_state.app_mode == "TERMINAL":
             st.caption("⏳ **GRAFİK SÜRESİ**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
             days_api = "1" if day_opt == "24 Saat" else "7"
             
-            # BUTON
-            analyze_btn = st.button("ANALİZİ BAŞLAT 🚀", type="primary")
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            st.caption("🌍 **DİL / LANGUAGE**")
+            lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
+            st.session_state.language = lng
 
-# --- 2. ORTA EKRAN (İÇERİK) ---
+# --- 2. ORTA EKRAN (İÇERİK - ARTIK DAHA GENİŞ) ---
 with col_mid:
     if st.session_state.app_mode == "TERMINAL":
-        # Coin Verisi
         coin_id = coin_input.lower().strip()
         data = get_coin_data(coin_id, st.session_state.currency)
         
@@ -167,8 +173,8 @@ with col_mid:
             
             # Başlık ve Fiyat
             h1, h2 = st.columns([2, 1])
-            h1.markdown(f"<h1 style='font-size: 48px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
-            h2.markdown(f"<h1 style='text-align:right; color: {st.session_state.theme_color}; margin:0;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1>", unsafe_allow_html=True)
+            h1.markdown(f"<h1 style='font-size: 56px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
+            h2.markdown(f"<h1 style='text-align:right; color: {st.session_state.theme_color}; margin:0; font-size: 56px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1>", unsafe_allow_html=True)
             
             # Grafik
             chart_df = get_chart_data(coin_id, st.session_state.currency, days_api)
@@ -183,7 +189,6 @@ with col_mid:
                 with st.spinner("Yapay zeka verileri işliyor..."):
                     model = get_model()
                     
-                    # Prompt Hazırlığı
                     base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Durum: Son {day_opt} grafiği."
                     lang_prompt = "Türkçe ve profesyonel bir dille yanıtla." if st.session_state.language == 'TR' else "Answer in professional English."
                     
@@ -191,7 +196,7 @@ with col_mid:
                         specific_prompt = "Bu coinin risk seviyesini 0-100 arası puanla. Destek ve direnç noktalarını belirt. Volatilite durumunu analiz et. Yatırımcı neye dikkat etmeli?"
                     elif "Fiyat" in analysis_type:
                         specific_prompt = "Kısa vadeli (haftalık) ve orta vadeli fiyat tahmin senaryoları oluştur. Boğa (yükseliş) ve Ayı (düşüş) durumunda hedefler ne olabilir? Maddeler halinde yaz."
-                    else: # Genel Bakış
+                    else: 
                         specific_prompt = "Coine genel bir bakış at. Piyasadaki son durumu, temel analizi ve teknik göstergeleri özetle."
                     
                     full_prompt = f"{base_prompt} {lang_prompt} {specific_prompt}"
@@ -205,11 +210,10 @@ with col_mid:
             st.warning("Veri bekleniyor... (Doğru coin ismini girdiğinizden emin olun)")
             
     else:
-        # PORTAL MODU
         st.title("🌍 NEXUS PORTAL")
         st.info("Burası yakında küresel piyasa verileriyle dolacak.")
 
-# --- 3. SAĞ PANEL (AYARLAR & HABERLER) ---
+# --- 3. SAĞ PANEL (SADECE AYARLAR VE HABERLER) ---
 with col_right:
     with st.container(border=True):
         st.markdown("#### ⚙️ Ayarlar")
@@ -222,15 +226,11 @@ with col_right:
         thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
         st.session_state.theme_color = THEMES[thm]
         
-        st.caption("Dil")
-        lng = st.radio("Dil", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
-        st.session_state.language = lng
-        
         st.markdown("---")
         
         # Haberler
         target = coin_input.lower().strip() if 'coin_input' in locals() else 'bitcoin'
-        st.markdown(f"#### 📰 {target.upper()} Haberleri")
+        st.markdown(f"#### 📰 {target.upper()} Haber")
         
         news = get_news(target)
         if news:
