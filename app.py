@@ -48,7 +48,7 @@ st.markdown(f"""
         border-radius: 10px;
         padding: 10px;
         text-align: center;
-        height: 250px; /* Risk ibresiyle aynı boyda olsun */
+        height: 250px;
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -83,16 +83,12 @@ except: pass
 
 @st.cache_resource
 def get_model():
-    # AKILLI MODEL SEÇİCİ: Hata vermeden çalışan modeli bulur
     try:
-        # Önce mevcut modelleri listele ve 'gemini' içeren ilk uygun modeli al
         for m in genai.list_models():
             if 'generateContent' in m.supported_generation_methods:
                 if 'gemini' in m.name:
                     return genai.GenerativeModel(m.name)
-    except:
-        pass
-    # Listeleme çalışmazsa güvenli limana dön
+    except: pass
     return genai.GenerativeModel("gemini-pro")
 
 @st.cache_data(ttl=60)
@@ -121,6 +117,20 @@ def get_news(coin_name):
         root = ET.fromstring(r.content)
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
     except: return []
+
+# --- RSI HESAPLAMA MOTORU (FEAR & GREED İÇİN) ---
+def calculate_rsi(df, period=14):
+    if df.empty: return 50 # Veri yoksa nötr dön
+    
+    delta = df['price'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    
+    # Son değeri al, NaN ise 50 döndür
+    return rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50
 
 # --- GRAFİK MOTORLARI ---
 def create_mountain_chart(df_price, price_change):
@@ -155,26 +165,27 @@ def create_mountain_chart(df_price, price_change):
     )
     return fig
 
-def create_gauge_chart(value):
-    # -20% ile +20% arasını 0-100'e yayıyoruz (Hassas İbre)
-    # Değişim 0 ise ibre 50'de durur.
-    score = 50 + (value * 2.5) 
-    score = max(0, min(100, score))
+def create_fear_greed_gauge(rsi_value):
+    # RSI Değeri (0-100) -> Fear & Greed Skalası
+    # 0-30: Fear (Kırmızı), 30-70: Neutral (Sarı/Turuncu), 70-100: Greed (Yeşil)
     
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
-        value = score,
-        title = {'text': "Piyasa İştahı (Risk)", 'font': {'size': 14, 'color': "gray"}},
+        value = rsi_value,
+        title = {'text': "FEAR & GREED INDEX", 'font': {'size': 14, 'color': "gray", 'family': "Arial Black"}},
         gauge = {
             'axis': {'range': [0, 100], 'tickwidth': 0},
-            'bar': {'color': "rgba(0,0,0,0)"},
+            'bar': {'color': "white", 'thickness': 0.02}, # İbreyi ince beyaz yapalım
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'steps': [
-                {'range': [0, 40], 'color': '#ea3943'},
-                {'range': [40, 60], 'color': '#F7931A'},
-                {'range': [60, 100], 'color': '#16c784'}],
-            'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': score}
+                {'range': [0, 25], 'color': '#ea3943'},  # Extreme Fear
+                {'range': [25, 45], 'color': '#ff9f43'}, # Fear
+                {'range': [45, 55], 'color': '#feca57'}, # Neutral
+                {'range': [55, 75], 'color': '#16c784'}, # Greed
+                {'range': [75, 100], 'color': '#00b894'} # Extreme Greed
+            ],
+            'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': rsi_value}
         }
     ))
     fig.update_layout(height=250, margin=dict(l=20, r=20, t=30, b=10), paper_bgcolor='rgba(0,0,0,0)')
@@ -225,25 +236,34 @@ with col_mid:
             with h1: st.markdown(f"<h1 style='font-size: 40px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
             with h2: st.markdown(f"<div style='text-align:right;'><h1 style='margin:0; font-size: 40px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1><h3 style='color: {trend_color}; margin:0;'>%{p_change:.2f}</h3></div>", unsafe_allow_html=True)
             
-            # ORTA: GRAFİK
+            # ORTA: GRAFİK (Mountain Chart)
             df_price = get_chart_data(coin_id, st.session_state.currency, days_api)
+            rsi_val = 50 # Default
+            
             if not df_price.empty:
+                # RSI HESAPLA
+                rsi_val = calculate_rsi(df_price)
+                
                 fig = create_mountain_chart(df_price, p_change)
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
             
-            # ALT: KOKPİT (RİSK ve MARKET CAP)
+            # ALT: KOKPİT (FEAR & GREED ve MARKET CAP)
             c_bot1, c_bot2 = st.columns(2)
+            
             with c_bot1:
-                st.plotly_chart(create_gauge_chart(p_change), use_container_width=True)
+                # Fear & Greed Gauge (RSI Tabanlı)
+                st.plotly_chart(create_fear_greed_gauge(rsi_val), use_container_width=True)
+            
             with c_bot2:
-                # Sayıları Milyar (M) veya Trilyon (T) olarak kısaltalım
+                # Market Cap
                 if m_cap > 1_000_000_000_000: cap_fmt = f"{m_cap/1_000_000_000_000:.2f} T"
                 elif m_cap > 1_000_000_000: cap_fmt = f"{m_cap/1_000_000_000:.2f} B"
+                elif m_cap > 1_000_000: cap_fmt = f"{m_cap/1_000_000:.2f} M"
                 else: cap_fmt = f"{m_cap:,.0f}"
 
                 st.markdown(f"""
                 <div class="stat-box">
-                    <h3 style="color: gray; margin: 0; font-size: 14px;">MARKET CAP</h3>
+                    <h3 style="color: gray; margin: 0; font-size: 14px; font-family: Arial Black;">MARKET CAP</h3>
                     <h1 style="color: white; margin: 10px 0; font-size: 36px;">{curr_sym}{cap_fmt}</h1>
                     <p style="color: {st.session_state.theme_color}; margin:0; font-size: 12px;">Toplam Piyasa Değeri</p>
                 </div>
@@ -257,8 +277,8 @@ with col_mid:
                 else:
                     with st.spinner("Analiz ediliyor..."):
                         try:
-                            model = get_model() # Akıllı seçim
-                            base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Market Cap: {m_cap}. Durum: Son {day_opt}."
+                            model = get_model()
+                            base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Market Cap: {m_cap}. RSI (Fear/Greed): {rsi_val:.2f}. Durum: Son {day_opt}."
                             lang_prompt = "Türkçe yanıtla." if st.session_state.language == 'TR' else "Answer in English."
                             full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap."
                             res = model.generate_content(full_prompt)
