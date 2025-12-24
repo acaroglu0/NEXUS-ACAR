@@ -41,18 +41,32 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
     
-    /* İSTATİSTİK KUTUSU (MARKET CAP) */
-    .stat-box {{
+    /* İSTATİSTİK KUTULARI (Genel Stil) */
+    .cockpit-box {{
         background-color: #151515;
         border: 1px solid #333;
         border-radius: 10px;
-        padding: 10px;
-        text-align: center;
-        height: 250px;
+        padding: 15px;
+        height: 300px; /* Hepsini aynı boya sabitledik */
+        overflow-y: auto; /* İçerik taşarsa kaydır */
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
+        text-align: center;
+    }}
+    
+    /* REKLAM ALANI STİLİ */
+    .ad-space {{
+        border: 1px dashed #444;
+        color: #444;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-weight: bold;
+        letter-spacing: 2px;
     }}
     
     div.stButton > button {{
@@ -118,21 +132,7 @@ def get_news(coin_name):
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
     except: return []
 
-# --- RSI HESAPLAMA MOTORU (FEAR & GREED İÇİN) ---
-def calculate_rsi(df, period=14):
-    if df.empty: return 50 # Veri yoksa nötr dön
-    
-    delta = df['price'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
-    
-    # Son değeri al, NaN ise 50 döndür
-    return rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else 50
-
-# --- GRAFİK MOTORLARI ---
+# --- GRAFİK MOTORU ---
 def create_mountain_chart(df_price, price_change):
     if price_change < 0:
         main_color = '#ea3943' 
@@ -163,32 +163,6 @@ def create_mountain_chart(df_price, price_change):
         xaxis=dict(showgrid=False, color='gray', gridcolor='rgba(128,128,128,0.1)'),
         yaxis=dict(side='right', visible=True, showgrid=True, gridcolor='rgba(128,128,128,0.1)', color='white', range=[y_min, y_max], tickprefix=st.session_state.currency.upper() + " ")
     )
-    return fig
-
-def create_fear_greed_gauge(rsi_value):
-    # RSI Değeri (0-100) -> Fear & Greed Skalası
-    # 0-30: Fear (Kırmızı), 30-70: Neutral (Sarı/Turuncu), 70-100: Greed (Yeşil)
-    
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = rsi_value,
-        title = {'text': "FEAR & GREED INDEX", 'font': {'size': 14, 'color': "gray", 'family': "Arial Black"}},
-        gauge = {
-            'axis': {'range': [0, 100], 'tickwidth': 0},
-            'bar': {'color': "white", 'thickness': 0.02}, # İbreyi ince beyaz yapalım
-            'bgcolor': "rgba(0,0,0,0)",
-            'borderwidth': 0,
-            'steps': [
-                {'range': [0, 25], 'color': '#ea3943'},  # Extreme Fear
-                {'range': [25, 45], 'color': '#ff9f43'}, # Fear
-                {'range': [45, 55], 'color': '#feca57'}, # Neutral
-                {'range': [55, 75], 'color': '#16c784'}, # Greed
-                {'range': [75, 100], 'color': '#00b894'} # Extreme Greed
-            ],
-            'threshold': {'line': {'color': "white", 'width': 4}, 'thickness': 0.75, 'value': rsi_value}
-        }
-    ))
-    fig.update_layout(height=250, margin=dict(l=20, r=20, t=30, b=10), paper_bgcolor='rgba(0,0,0,0)')
     return fig
 
 # --- EKRAN DÜZENİ ---
@@ -236,39 +210,60 @@ with col_mid:
             with h1: st.markdown(f"<h1 style='font-size: 40px; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
             with h2: st.markdown(f"<div style='text-align:right;'><h1 style='margin:0; font-size: 40px;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h1><h3 style='color: {trend_color}; margin:0;'>%{p_change:.2f}</h3></div>", unsafe_allow_html=True)
             
-            # ORTA: GRAFİK (Mountain Chart)
+            # ORTA: GRAFİK
             df_price = get_chart_data(coin_id, st.session_state.currency, days_api)
-            rsi_val = 50 # Default
-            
             if not df_price.empty:
-                # RSI HESAPLA
-                rsi_val = calculate_rsi(df_price)
-                
                 fig = create_mountain_chart(df_price, p_change)
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
             
-            # ALT: KOKPİT (FEAR & GREED ve MARKET CAP)
-            c_bot1, c_bot2 = st.columns(2)
+            # --- ALT KOKPİT (3 EŞİT KUTU) ---
+            # 1: AI CHAT | 2: REKLAM | 3: MARKET CAP
+            c_bot1, c_bot2, c_bot3 = st.columns(3)
             
+            # 1. KUTU: AI CHAT (INTERAKTİF)
             with c_bot1:
-                # Fear & Greed Gauge (RSI Tabanlı)
-                st.plotly_chart(create_fear_greed_gauge(rsi_val), use_container_width=True)
+                with st.container(border=True): # Kutu Görünümü
+                    st.caption(f"🤖 **NEXUS AI: {coin_id.upper()} Asistanı**")
+                    user_q = st.text_input("Soru sor (Örn: Destek neresi?)", key="mini_chat_q")
+                    if st.button("Sor"):
+                        if not st.secrets.get("GEMINI_API_KEY"):
+                            st.error("API Key Eksik")
+                        else:
+                            with st.spinner("..."):
+                                try:
+                                    model = get_model()
+                                    p = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Soru: {user_q}. Kısa ve öz cevapla."
+                                    r = model.generate_content(p)
+                                    st.info(r.text)
+                                except: st.error("Hata.")
             
+            # 2. KUTU: REKLAM ALANI (BOŞ)
             with c_bot2:
-                # Market Cap
+                # Burayı CSS ile özelleştirilmiş boş bir alan yapıyoruz
+                st.markdown("""
+                <div class="cockpit-box">
+                    <div class="ad-space">
+                        REKLAM ALANI
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # 3. KUTU: MARKET CAP
+            with c_bot3:
+                # Market Cap Hesaplama
                 if m_cap > 1_000_000_000_000: cap_fmt = f"{m_cap/1_000_000_000_000:.2f} T"
                 elif m_cap > 1_000_000_000: cap_fmt = f"{m_cap/1_000_000_000:.2f} B"
-                elif m_cap > 1_000_000: cap_fmt = f"{m_cap/1_000_000:.2f} M"
                 else: cap_fmt = f"{m_cap:,.0f}"
 
                 st.markdown(f"""
-                <div class="stat-box">
-                    <h3 style="color: gray; margin: 0; font-size: 14px; font-family: Arial Black;">MARKET CAP</h3>
-                    <h1 style="color: white; margin: 10px 0; font-size: 36px;">{curr_sym}{cap_fmt}</h1>
-                    <p style="color: {st.session_state.theme_color}; margin:0; font-size: 12px;">Toplam Piyasa Değeri</p>
+                <div class="cockpit-box">
+                    <h3 style="color: gray; margin: 0; font-size: 14px;">MARKET CAP</h3>
+                    <h1 style="color: white; margin: 10px 0; font-size: 28px;">{curr_sym}{cap_fmt}</h1>
+                    <p style="color: {st.session_state.theme_color}; margin:0; font-size: 11px;">Toplam Piyasa Değeri</p>
                 </div>
                 """, unsafe_allow_html=True)
 
+            # ANA ANALİZ ÇIKTISI
             if analyze_btn:
                 st.markdown("---")
                 st.subheader(f"🤖 NEXUS AI: {analysis_type}")
@@ -278,7 +273,7 @@ with col_mid:
                     with st.spinner("Analiz ediliyor..."):
                         try:
                             model = get_model()
-                            base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Market Cap: {m_cap}. RSI (Fear/Greed): {rsi_val:.2f}. Durum: Son {day_opt}."
+                            base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Market Cap: {m_cap}. Durum: Son {day_opt}."
                             lang_prompt = "Türkçe yanıtla." if st.session_state.language == 'TR' else "Answer in English."
                             full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap."
                             res = model.generate_content(full_prompt)
