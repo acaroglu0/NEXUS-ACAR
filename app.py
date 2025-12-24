@@ -7,9 +7,8 @@ import plotly.graph_objects as go
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁")
 
-# Session State
 if 'page' not in st.session_state: st.session_state.page = 'Terminal'
-if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931A' # Default Bitcoin Turuncusu
+if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931A' 
 if 'currency' not in st.session_state: st.session_state.currency = 'try'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'show_right_panel' not in st.session_state: st.session_state.show_right_panel = True
@@ -22,27 +21,29 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS İLE İKİZ GÖRÜNÜM (SOL VE SAĞI EŞİTLEME) ---
-st.markdown(f"""
+# --- 2. GÖRSEL İKİZLEME (CSS SİHİRBAZLIĞI) ---
+st.markdown("""
 <style>
-    /* 1. Sol Menü Rengi (Koyu Gri) */
-    [data-testid="stSidebar"] {{
+    /* Sol Menü (Referans Rengi: #262730) */
+    [data-testid="stSidebar"] {
         background-color: #262730;
         border-right: 1px solid #444;
-    }}
+    }
     
-    /* 2. Sağ Panel İçin Özel Stil (Solun Aynısı Olsun Diye) */
-    div[data-testid="stVerticalBlockBorderWrapper"] {{
-        background-color: #262730; /* Sol menü ile aynı renk */
-        border: 1px solid #444;
-        border-radius: 5px;
-        padding: 1rem;
-    }}
-
-    /* 3. Metin Renklerini Eşitle */
-    h1, h2, h3, p, span {{
+    /* Sağ Panel (Solun Aynısı Olması İçin) */
+    /* Bu sınıfı aşağıda sağ panele vereceğiz */
+    .css-right-panel {
+        background-color: #262730; /* Sol menüyle birebir aynı gri */
+        padding: 20px;
+        border-radius: 0px; /* Köşeli olsun sol gibi */
+        border-left: 1px solid #444;
+        height: 100%;
+    }
+    
+    /* Genel Yazı Renkleri */
+    h1, h2, h3, p, span, div {
         color: white !important;
-    }}
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -93,7 +94,6 @@ def get_top_coins(currency):
         return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}).json()
     except: return []
 
-# --- GRAFİK ---
 def create_price_chart(df, theme_color):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -108,17 +108,14 @@ def create_price_chart(df, theme_color):
     )
     return fig
 
-# --- SOL MENÜ (NATIVE SIDEBAR) ---
+# --- SOL MENÜ (ORİJİNAL) ---
 with st.sidebar:
     st.markdown(f"<h2 style='color: {st.session_state.theme_color}; text-align: center;'>🦁 NEXUS</h2>", unsafe_allow_html=True)
-    
-    # Butonlar
     c1, c2 = st.columns(2)
     if c1.button("📡 TERMINAL", use_container_width=True): st.session_state.page = 'Terminal'
     if c2.button("🌐 PORTAL", use_container_width=True): st.session_state.page = 'Portal'
     st.markdown("---")
     
-    # İçerik
     if st.session_state.page == 'Terminal':
         st.caption("ANALİZ KOKPİTİ")
         coin_input_sb = st.text_input("Kripto Ara:", "bitcoin")
@@ -129,41 +126,35 @@ with st.sidebar:
         days_select = "7"
         analyze_btn = False
 
-# --- EKRAN DÜZENİ (SİMETRİ) ---
+# --- ANA EKRAN DÜZENİ ---
 def toggle_panel(): st.session_state.show_right_panel = not st.session_state.show_right_panel
 
-# ORAN AYARI: Sol menü genelde %20'dir. Biz de sağa %20 verelim.
-# [4, 1] oranı genelde sidebar genişliğine çok yakındır.
+# 4'e 1 Oranı (Sol menü genişliğine en yakını)
 if st.session_state.show_right_panel:
-    col_main, col_right = st.columns([4, 1]) 
+    col_main, col_right = st.columns([3.5, 1]) 
 else:
     col_main = st.container()
     col_right = None
 
-# --- ORTA (GRAFİK) ---
+# --- ORTA KISIM (GRAFİK) ---
 with col_main:
-    # Toggle Butonu (Sağ üst)
+    # Toggle Butonu
     h_c1, h_c2 = st.columns([20, 1])
     h_c2.button("◫", on_click=toggle_panel, help="Paneli Aç/Kapat")
 
     if st.session_state.page == 'Terminal':
-        # COIN MANTIĞI
         coin_id = st.session_state.get('selected_coin', coin_input_sb.lower().strip())
-        
         data = get_coin_data(coin_id, st.session_state.currency)
+        
         if data:
             curr_sym = "₺" if st.session_state.currency == 'try' else "$" if st.session_state.currency == 'usd' else "€"
-            
-            # Başlık
             h_c1.markdown(f"<h1 style='color: {st.session_state.theme_color}; margin:0;'>{coin_id.upper()}</h1>", unsafe_allow_html=True)
             h_c1.markdown(f"<h2 style='margin:0;'>{curr_sym}{data[st.session_state.currency]:,.2f}</h2>", unsafe_allow_html=True)
 
-            # Grafik
             chart_df = get_chart_data(coin_id, st.session_state.currency, days_select)
             if not chart_df.empty:
                 st.plotly_chart(create_price_chart(chart_df, st.session_state.theme_color), use_container_width=True, config={'displayModeBar': False})
             
-            # Analiz
             if analyze_btn:
                 with st.spinner("NEXUS Analiz Ediyor..."):
                     model = get_model()
@@ -182,49 +173,49 @@ with col_main:
             df = pd.DataFrame(top10)[['market_cap_rank', 'name', 'current_price', 'price_change_percentage_24h']]
             st.dataframe(df, use_container_width=True)
 
-# --- SAĞ PANEL (SOLUN İKİZİ) ---
+# --- SAĞ PANEL (SOLUN AYNISI) ---
 if st.session_state.show_right_panel and col_right:
     with col_right:
-        # border=True kullanarak ve CSS ile rengini değiştirerek sol menünün aynısını yapıyoruz
-        with st.container(border=True):
-            
-            # 1. FAVORİLER
-            st.markdown("#### ⭐ Favoriler")
-            def set_coin(c): st.session_state.selected_coin = c
-            
-            c_f1, c_f2 = st.columns(2)
-            if c_f1.button("BTC", use_container_width=True): set_coin("bitcoin")
-            if c_f2.button("ETH", use_container_width=True): set_coin("ethereum")
-            
-            c_f3, c_f4 = st.columns(2)
-            if c_f3.button("SOL", use_container_width=True): set_coin("solana")
-            if c_f4.button("AVAX", use_container_width=True): set_coin("avalanche-2")
-            
-            if st.button("DOGE", use_container_width=True): set_coin("dogecoin")
-            
-            st.markdown("---")
-
-            # 2. AYARLAR
-            st.markdown("#### ⚙️ Ayarlar")
-            
-            st.caption("Para Birimi")
-            curr = st.selectbox("Para Birimi", ["TRY", "USD", "EUR"], label_visibility="collapsed")
-            st.session_state.currency = curr.lower()
-            
-            st.caption("Tema Rengi")
-            thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
-            st.session_state.theme_color = THEMES[thm]
-            
-            st.caption("Dil")
-            lng = st.radio("Dil", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
-            st.session_state.language = lng
-
-            st.markdown("---")
-
-            # 3. HABERLER
-            target = st.session_state.get('selected_coin', 'bitcoin')
-            st.markdown(f"#### 📰 {target.upper()} Haber")
-            news = get_news(target)
-            if news:
-                for n in news:
-                    st.markdown(f"• [{n['title']}]({n['link']})")
+        # Burası kritik: İçine koyduğumuz kutunun rengini sol menüyle (#262730) aynı yapıyoruz
+        st.markdown(f"""
+        <div class="css-right-panel">
+            <h4 style="color:white; margin-top:0;">⭐ Favoriler</h4>
+        """, unsafe_allow_html=True)
+        
+        # Streamlit butonlarını HTML içine gömemeyiz, o yüzden standart butonları kullanıyoruz
+        # Ancak arka planları koyu gri kutunun üstünde duracak
+        
+        def set_coin(c): st.session_state.selected_coin = c
+        
+        c_f1, c_f2 = st.columns(2)
+        if c_f1.button("BTC", use_container_width=True): set_coin("bitcoin")
+        if c_f2.button("ETH", use_container_width=True): set_coin("ethereum")
+        
+        c_f3, c_f4 = st.columns(2)
+        if c_f3.button("SOL", use_container_width=True): set_coin("solana")
+        if c_f4.button("AVAX", use_container_width=True): set_coin("avalanche-2")
+        
+        if st.button("DOGE", use_container_width=True): set_coin("dogecoin")
+        
+        st.markdown("---")
+        st.markdown("<h4>⚙️ Ayarlar</h4>", unsafe_allow_html=True)
+        
+        curr = st.selectbox("Para Birimi", ["TRY", "USD", "EUR"], label_visibility="collapsed")
+        st.session_state.currency = curr.lower()
+        
+        thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
+        st.session_state.theme_color = THEMES[thm]
+        
+        lng = st.radio("Dil", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
+        st.session_state.language = lng
+        
+        st.markdown("---")
+        target = st.session_state.get('selected_coin', 'bitcoin')
+        st.markdown(f"<h4>📰 {target.upper()} Haber</h4>", unsafe_allow_html=True)
+        
+        news = get_news(target)
+        if news:
+            for n in news:
+                st.markdown(f"<div style='background-color:#1E1E1E; padding:8px; margin-bottom:5px; border-radius:5px;'><a href='{n['link']}' style='color:white; text-decoration:none; font-size:12px;'>{n['title']}</a></div>", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True) # Kutuyu kapat
