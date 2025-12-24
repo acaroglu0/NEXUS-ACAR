@@ -20,7 +20,7 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (DÜZEN VE STİL) ---
+# --- 2. CSS (TASARIM) ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
@@ -62,20 +62,15 @@ st.markdown(f"""
 
 # --- API AYARLARI ---
 try:
-    # Secrets dosyasından anahtarı almayı dene, yoksa boş geç (Hata vermesin, aşağıda uyarırız)
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     if api_key:
         genai.configure(api_key=api_key)
-except:
-    pass # Hata olursa sessiz kal, butona basınca uyarı veririz
+except: pass
 
 @st.cache_resource
 def get_model():
-    # Önce Hızlı Modeli Dene, Olmazsa Pro'ya Geç
-    try:
-        return genai.GenerativeModel("gemini-1.5-flash")
-    except:
-        return genai.GenerativeModel("gemini-pro")
+    # DÜZELTME: Flash yerine en stabil model olan gemini-pro kullanıyoruz.
+    return genai.GenerativeModel("gemini-pro")
 
 @st.cache_data(ttl=60)
 def get_coin_data(coin_id, currency):
@@ -191,23 +186,21 @@ with col_mid:
                 st.markdown("---")
                 st.subheader(f"🤖 NEXUS AI: {analysis_type}")
                 
-                # --- HATA AYIKLAMA MODU ---
                 if not st.secrets.get("GEMINI_API_KEY"):
-                    st.error("⚠️ API Anahtarı Bulunamadı! Lütfen Streamlit ayarlarında 'GEMINI_API_KEY' tanımlayın.")
+                    st.error("⚠️ API Anahtarı Bulunamadı!")
                 else:
                     with st.spinner("Yapay zeka verileri yorumluyor..."):
                         try:
+                            # Model fixlendi: gemini-pro
                             model = get_model()
                             base_prompt = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Durum: Son {day_opt}."
                             lang_prompt = "Türkçe yanıtla." if st.session_state.language == 'TR' else "Answer in English."
-                            full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap. Yatırım tavsiyesi olmadığını belirt."
+                            full_prompt = f"{base_prompt} {lang_prompt} {analysis_type} yap. Yatırım tavsiyesi değildir uyarısı ekle."
                             
                             res = model.generate_content(full_prompt)
                             st.info(res.text)
                         except Exception as e:
-                            # Hatanın gerçek sebebini ekrana yazdırıyoruz
-                            st.error(f"⚠️ Bağlantı Hatası: {str(e)}")
-                            st.caption("Çözüm: Sayfayı yenileyin veya API kotanızı kontrol edin.")
+                            st.error(f"Hata: {str(e)}")
         else:
             st.warning("Veri bekleniyor...")
     else:
