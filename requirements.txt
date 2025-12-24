@@ -1,3 +1,5 @@
 streamlit
 google-generativeai
 requests
+plotly
+pandas
