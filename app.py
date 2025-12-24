@@ -40,15 +40,10 @@ st.markdown(f"""
         border: 1px solid #333;
         margin-bottom: 10px;
     }}
-    
-    /* İSTATİSTİK KUTULARI (Genel Stil) */
-    .cockpit-box {{
-        background-color: #151515;
-        border: 1px solid #333;
-        border-radius: 10px;
-        padding: 15px;
-        height: 300px; /* Hepsini aynı boya sabitledik */
-        overflow-y: auto; /* İçerik taşarsa kaydır */
+
+    /* KUTU İÇERİKLERİNİ ORTALAMA VE YÜKSEKLİK AYARI */
+    .box-content {{
+        height: 180px; /* AI Kutusunun ortalama yüksekliğine eşitledik */
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -57,16 +52,17 @@ st.markdown(f"""
     }}
     
     /* REKLAM ALANI STİLİ */
-    .ad-space {{
-        border: 1px dashed #444;
-        color: #444;
+    .ad-placeholder {{
         width: 100%;
         height: 100%;
+        border: 2px dashed #333;
+        border-radius: 8px;
+        color: #555;
         display: flex;
         justify-content: center;
         align-items: center;
         font-weight: bold;
-        letter-spacing: 2px;
+        letter-spacing: 1px;
     }}
     
     div.stButton > button {{
@@ -216,52 +212,51 @@ with col_mid:
                 fig = create_mountain_chart(df_price, p_change)
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False, 'scrollZoom': False})
             
-            # --- ALT KOKPİT (3 EŞİT KUTU) ---
-            # 1: AI CHAT | 2: REKLAM | 3: MARKET CAP
+            # --- ALT KOKPİT (3 EŞİT KUTUCUK) ---
+            # Hepsi st.container(border=True) kullanıyor = AYNI GÖRÜNÜM
             c_bot1, c_bot2, c_bot3 = st.columns(3)
             
-            # 1. KUTU: AI CHAT (INTERAKTİF)
+            # 1. KUTU: AI CHAT
             with c_bot1:
-                with st.container(border=True): # Kutu Görünümü
-                    st.caption(f"🤖 **NEXUS AI: {coin_id.upper()} Asistanı**")
-                    user_q = st.text_input("Soru sor (Örn: Destek neresi?)", key="mini_chat_q")
-                    if st.button("Sor"):
-                        if not st.secrets.get("GEMINI_API_KEY"):
-                            st.error("API Key Eksik")
+                with st.container(border=True):
+                    # İçeriği ortalamak için CSS sınıfı kullanıyoruz
+                    st.caption(f"🤖 **NEXUS ASİSTAN**")
+                    user_q = st.text_input("Soru sor:", key="chat", placeholder="Direnç neresi?", label_visibility="collapsed")
+                    if st.button("SOR", key="ask_btn"):
+                        if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
                         else:
-                            with st.spinner("..."):
+                            with st.spinner("."):
                                 try:
-                                    model = get_model()
-                                    p = f"Coin: {coin_id}. Fiyat: {data[st.session_state.currency]}. Soru: {user_q}. Kısa ve öz cevapla."
-                                    r = model.generate_content(p)
+                                    m = get_model()
+                                    r = m.generate_content(f"Coin: {coin_id}. Soru: {user_q}. Çok kısa cevapla.")
                                     st.info(r.text)
-                                except: st.error("Hata.")
-            
-            # 2. KUTU: REKLAM ALANI (BOŞ)
+                                except: pass
+
+            # 2. KUTU: REKLAM ALANI
             with c_bot2:
-                # Burayı CSS ile özelleştirilmiş boş bir alan yapıyoruz
-                st.markdown("""
-                <div class="cockpit-box">
-                    <div class="ad-space">
-                        REKLAM ALANI
+                with st.container(border=True):
+                    # Yüksekliği eşitlemek için box-content div'i
+                    st.markdown("""
+                    <div class="box-content">
+                        <div class="ad-placeholder">REKLAM ALANI</div>
                     </div>
-                </div>
-                """, unsafe_allow_html=True)
-            
+                    """, unsafe_allow_html=True)
+
             # 3. KUTU: MARKET CAP
             with c_bot3:
-                # Market Cap Hesaplama
-                if m_cap > 1_000_000_000_000: cap_fmt = f"{m_cap/1_000_000_000_000:.2f} T"
-                elif m_cap > 1_000_000_000: cap_fmt = f"{m_cap/1_000_000_000:.2f} B"
-                else: cap_fmt = f"{m_cap:,.0f}"
-
-                st.markdown(f"""
-                <div class="cockpit-box">
-                    <h3 style="color: gray; margin: 0; font-size: 14px;">MARKET CAP</h3>
-                    <h1 style="color: white; margin: 10px 0; font-size: 28px;">{curr_sym}{cap_fmt}</h1>
-                    <p style="color: {st.session_state.theme_color}; margin:0; font-size: 11px;">Toplam Piyasa Değeri</p>
-                </div>
-                """, unsafe_allow_html=True)
+                with st.container(border=True):
+                    # Market Cap Formatı
+                    if m_cap > 1_000_000_000_000: cap_fmt = f"{m_cap/1_000_000_000_000:.2f} T"
+                    elif m_cap > 1_000_000_000: cap_fmt = f"{m_cap/1_000_000_000:.2f} B"
+                    else: cap_fmt = f"{m_cap:,.0f}"
+                    
+                    st.markdown(f"""
+                    <div class="box-content">
+                        <h3 style="color: gray; margin: 0; font-size: 14px;">MARKET CAP</h3>
+                        <h1 style="color: white; margin: 10px 0; font-size: 32px;">{curr_sym}{cap_fmt}</h1>
+                        <p style="color: {st.session_state.theme_color}; margin:0; font-size: 11px;">Toplam Değer</p>
+                    </div>
+                    """, unsafe_allow_html=True)
 
             # ANA ANALİZ ÇIKTISI
             if analyze_btn:
