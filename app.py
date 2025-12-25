@@ -77,6 +77,15 @@ st.markdown(f"""
         padding: 15px;
         margin-bottom: 10px;
     }}
+
+    /* TOP 10 KARTI */
+    .top10-card {{
+        background-color: #1E1E1E;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        border: 1px solid #333;
+    }}
     
     div.stButton > button {{
         width: 100%;
@@ -218,10 +227,20 @@ col_right = cols[2] if len(cols) > 2 else None
 # --- SOL PANEL (NAVİGASYON - HER ZAMAN SABİT) ---
 with col_nav:
     with st.container(border=True):
+        # LOGO & BAŞLIK DÜZENİ (GÜNCELLENDİ)
         if os.path.exists("logo.jpeg"):
-            c_logo, c_text = st.columns([1, 3]) 
-            with c_logo: st.image("logo.jpeg", width=70)
-            with c_text: st.markdown(f"<div style='display: flex; align-items: center; height: 100%;'><h1 style='color: {st.session_state.theme_color}; margin:0; font-size: 28px; font-weight: 900; letter-spacing: 2px;'>NEXUS</h1></div>", unsafe_allow_html=True)
+            # Logonun olduğu sütunu biraz daha genişlettim (1'den 1.2'ye)
+            c_logo, c_text = st.columns([1.2, 3]) 
+            with c_logo:
+                 # Logoyu büyüttüm (70 -> 90)
+                 st.image("logo.jpeg", width=90)
+            with c_text:
+                 # Yazıyı sağa kaydırdım (margin-left: 15px) ve dikey ortaladım
+                 st.markdown(f"""
+                 <div style='display: flex; align-items: center; height: 100%; margin-left: 15px;'>
+                     <h1 style='color: {st.session_state.theme_color}; margin:0; font-size: 28px; font-weight: 900; letter-spacing: 2px;'>NEXUS</h1>
+                 </div>
+                 """, unsafe_allow_html=True)
         else:
             st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
             
@@ -384,7 +403,7 @@ with col_main:
                 color = "#16c784" if chg > 0 else "#ea3943"
                 with cols_top[idx]:
                     st.markdown(f"""
-                    <div style="background-color: #1E1E1E; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #333;">
+                    <div class="top10-card">
                         <img src="{coin['image']}" width="30">
                         <div style="font-weight: bold; margin-top:5px;">{coin['symbol'].upper()}</div>
                         <div style="font-size: 14px;">{curr_sym}{coin['current_price']}</div>
