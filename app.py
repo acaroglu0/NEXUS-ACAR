@@ -21,12 +21,11 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- 2. CSS (DÜZELTMELER) ---
+# --- 2. CSS ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
     
-    /* SCROLL FIX: Tepeye 3rem boşluk verdik, artık yukarı çıkılabilecek */
     .block-container {{
         padding-top: 3rem;
         padding-bottom: 2rem;
@@ -166,7 +165,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
 # --- EKRAN DÜZENİ ---
 col_left, col_mid, col_right = st.columns([1, 4, 1])
 
-# --- SOL PANEL (GİRİŞ & ANALİZ) ---
+# --- SOL PANEL (GİRİŞ & ANALİZ & AYARLAR) ---
 with col_left:
     with st.container(border=True):
         st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
@@ -178,7 +177,7 @@ with col_left:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 2. ANALİZ TÜRÜ (GERİ GELDİ)
+        # 2. ANALİZ TÜRÜ
         st.caption("🧠 **ANALİZ TÜRÜ**")
         analysis_type = st.selectbox("Seçiniz:", ["Genel Bakış", "Fiyat Tahmini 🎯", "Risk Analizi ⚠️"], label_visibility="collapsed")
         
@@ -187,18 +186,25 @@ with col_left:
         
         st.markdown("---")
         
-        # 4. SÜRE
+        # 4. SÜRE (Sadece Terminalde Görünür)
         if st.session_state.app_mode == "TERMINAL":
             st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
             days_api = "1" if day_opt == "24 Saat" else "7"
             
             st.markdown("<br>", unsafe_allow_html=True)
-            
-            # 5. DİL (SOLA GERİ GELDİ)
-            st.caption("🌍 **DİL**")
-            lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
-            st.session_state.language = lng
+        
+        # 5. PORTAL / MOD SEÇİMİ (İSTEDİĞİN YER: SÜRE ve DİL ARASI)
+        st.caption("🌐 **MOD SEÇİMİ**")
+        mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
+        st.session_state.app_mode = mode_select
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # 6. DİL
+        st.caption("🌍 **DİL**")
+        lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
+        st.session_state.language = lng
 
 # --- ORTA EKRAN ---
 with col_mid:
@@ -295,11 +301,15 @@ with col_mid:
                              res = model.generate_content(prompt)
                              st.markdown(res.text)
                          except: st.error("Bağlantı hatası.")
-
         else:
             st.warning("Veri bekleniyor... (Coin ismini kontrol edin)")
 
-# --- SAĞ PANEL ---
+    else:
+        # PORTAL EKRANI
+        st.title("🌍 NEXUS GLOBAL PORTAL")
+        st.info("Küresel piyasa verileri burada listelenecek.")
+
+# --- SAĞ PANEL (AYARLAR) ---
 with col_right:
     with st.container(border=True):
         st.markdown("#### ⚙️ Ayarlar")
