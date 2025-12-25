@@ -5,15 +5,22 @@ import pandas as pd
 import plotly.graph_objects as go
 import time
 import os
+import datetime
 
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
 
-# DEFAULT AYARLAR
+# SESSION STATE (AYARLAR & SOSYAL MEDYA)
 if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931A'
 if 'currency' not in st.session_state: st.session_state.currency = 'usd'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'app_mode' not in st.session_state: st.session_state.app_mode = 'TERMINAL'
+if 'posts' not in st.session_state: 
+    # Örnek başlangıç postları
+    st.session_state.posts = [
+        {"user": "Admin 🦁", "msg": "NEXUS Portal'a hoş geldiniz! Piyasa bugün hareketli.", "time": "10:00"},
+        {"user": "Trader_01", "msg": "BTC dominansı düşüyor, altcoin rallisi yakın mı?", "time": "10:05"}
+    ]
 
 THEMES = {
     "Bitcoin Turuncusu 🟠": "#F7931A",
@@ -53,18 +60,22 @@ st.markdown(f"""
         text-align: center;
     }}
     
-    .ad-placeholder {{
-        width: 100%;
-        height: 100%;
-        border: 2px dashed #333;
-        border-radius: 8px;
-        color: #555;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-weight: bold;
-        letter-spacing: 1px;
-        font-size: 12px;
+    /* PORTAL HABER KARTI */
+    .news-card {{
+        background-color: #151515;
+        border-left: 4px solid {st.session_state.theme_color};
+        padding: 15px;
+        margin-bottom: 10px;
+        border-radius: 4px;
+    }}
+    
+    /* SOSYAL MEDYA KARTI */
+    .social-card {{
+        background-color: #202020;
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
     }}
     
     div.stButton > button {{
@@ -101,7 +112,7 @@ def get_model():
     except: pass
     return genai.GenerativeModel("gemini-pro")
 
-# --- DAYANIKLI VERİ MOTORU ---
+# --- VERİ MOTORU ---
 
 @st.cache_data(ttl=3600) 
 def search_coin_id(query):
@@ -127,13 +138,20 @@ def get_coin_data(coin_id, currency):
     except: return None
     return None
 
-# GÜNCELLEME: GLOBAL VERİ ARTIK 24 SAAT (86400 SN) CACHE'DE TUTULUYOR
 @st.cache_data(ttl=86400) 
 def get_global_data():
     try:
         url = "https://api.coingecko.com/api/v3/global"
         return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()['data']
     except: return None
+
+@st.cache_data(ttl=300)
+def get_top10_coins(currency):
+    # TOP 10 LISTESI
+    try:
+        url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency={currency}&order=market_cap_desc&per_page=10&page=1&sparkline=false"
+        return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()
+    except: return []
 
 @st.cache_data(ttl=300)
 def get_chart_data(coin_id, currency, days):
@@ -149,13 +167,14 @@ def get_chart_data(coin_id, currency, days):
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=600)
-def get_news(coin_name):
+def get_news(topic):
     try:
         import xml.etree.ElementTree as ET
-        rss_url = f"https://news.google.com/rss/search?q={coin_name}+crypto&hl=tr&gl=TR&ceid=TR:tr"
+        # Topic'e göre arama
+        rss_url = f"https://news.google.com/rss/search?q={topic}&hl=tr&gl=TR&ceid=TR:tr"
         r = requests.get(rss_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         root = ET.fromstring(r.content)
-        return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:5]]
+        return [{"title": i.find("title").text, "link": i.find("link").text, "pubDate": i.find("pubDate").text} for i in root.findall(".//item")[:10]]
     except: return []
 
 # --- GRAFİK ---
@@ -164,15 +183,11 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     if df.empty:
         fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                           xaxis=dict(visible=False), yaxis=dict(visible=False),
-                          annotations=[dict(text="Veri Yok (API Limiti)", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
+                          annotations=[dict(text="Veri Yok", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
         return fig
 
-    if price_change < 0:
-        main_color = '#ea3943' 
-        fill_color = 'rgba(234, 57, 67, 0.2)' 
-    else:
-        main_color = '#16c784' 
-        fill_color = 'rgba(22, 199, 132, 0.2)' 
+    main_color = '#ea3943' if price_change < 0 else '#16c784'
+    fill_color = 'rgba(234, 57, 67, 0.2)' if price_change < 0 else 'rgba(22, 199, 132, 0.2)' 
 
     min_p = df['price'].min()
     max_p = df['price'].max()
@@ -192,58 +207,68 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     )
     return fig
 
-# --- EKRAN DÜZENİ ---
-col_left, col_mid, col_right = st.columns([1, 4, 1])
+# --- EKRAN DÜZENİ MANTIĞI ---
+# Terminal modunda 3 sütun (1-4-1), Portal modunda 2 sütun (1-5)
+layout_cols = [1, 4, 1] if st.session_state.app_mode == "TERMINAL" else [1, 5]
+cols = st.columns(layout_cols)
+col_nav = cols[0]
+col_main = cols[1]
+col_right = cols[2] if len(cols) > 2 else None
 
-# SOL PANEL
-with col_left:
+# --- SOL PANEL (NAVİGASYON - HER ZAMAN SABİT) ---
+with col_nav:
     with st.container(border=True):
-        # --- LOGO ve BAŞLIK ALANI (JPEG Desteği) ---
         if os.path.exists("logo.jpeg"):
-            # Yan yana iki sütun: Logo (dar) ve Yazı (geniş)
             c_logo, c_text = st.columns([1, 3]) 
-            with c_logo:
-                 # Logoyu göster (genişliği sabitledik)
-                 st.image("logo.jpeg", width=70)
-            with c_text:
-                 # Şık, ortalanmış, tema renginde yazı
-                 st.markdown(f"""
-                 <div style='display: flex; align-items: center; height: 100%;'>
-                     <h1 style='color: {st.session_state.theme_color}; margin:0; font-size: 28px; font-weight: 900; letter-spacing: 2px;'>NEXUS</h1>
-                 </div>
-                 """, unsafe_allow_html=True)
+            with c_logo: st.image("logo.jpeg", width=70)
+            with c_text: st.markdown(f"<div style='display: flex; align-items: center; height: 100%;'><h1 style='color: {st.session_state.theme_color}; margin:0; font-size: 28px; font-weight: 900; letter-spacing: 2px;'>NEXUS</h1></div>", unsafe_allow_html=True)
         else:
-            # Logo yoksa eski usul devam
             st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
             
         st.markdown("---")
         
-        st.caption("🔍 **KRİPTO SEÇ**")
-        coin_input = st.text_input("Coin Ara:", "ethereum", label_visibility="collapsed")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
-        
-        st.markdown("---")
+        # SADECE TERMINAL MODUNDA GÖZÜKENLER
         if st.session_state.app_mode == "TERMINAL":
+            st.caption("🔍 **KRİPTO SEÇ**")
+            coin_input = st.text_input("Coin Ara:", "ethereum", label_visibility="collapsed")
+            st.markdown("<br>", unsafe_allow_html=True)
+            analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
+            st.markdown("---")
             st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
             days_api = "1" if day_opt == "24 Saat" else "7"
             st.markdown("<br>", unsafe_allow_html=True)
-        
+
+        # HER İKİ MODDA GÖZÜKENLER
         st.caption("🌐 **MOD SEÇİMİ**")
         mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
-        st.session_state.app_mode = mode_select
-        
+        # Mod değişirse sayfayı yenile ki layout güncellensin
+        if mode_select != st.session_state.app_mode:
+            st.session_state.app_mode = mode_select
+            st.rerun()
+            
         st.markdown("<br>", unsafe_allow_html=True)
         st.caption("🌍 **DİL**")
         lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
         st.session_state.language = lng
-
-# ORTA EKRAN
-with col_mid:
-    if st.session_state.app_mode == "TERMINAL":
         
+        # PORTAL MODUNDA AYARLAR BURAYA GELİR (Çünkü sağ panel yok)
+        if st.session_state.app_mode == "PORTAL":
+            st.markdown("---")
+            st.caption("⚙️ **AYARLAR**")
+            curr_opt = st.selectbox("Para Birimi", ["USD", "TRY", "EUR"], label_visibility="collapsed")
+            st.session_state.currency = curr_opt.lower()
+            thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
+            st.session_state.theme_color = THEMES[thm]
+
+
+# --- ANA İÇERİK (MODA GÖRE DEĞİŞİR) ---
+with col_main:
+    
+    # ==========================
+    # MOD 1: TERMINAL (ESKİ DÜZEN)
+    # ==========================
+    if st.session_state.app_mode == "TERMINAL":
         raw_input = coin_input.lower().strip()
         btc_id = "bitcoin"
         curr = st.session_state.currency
@@ -261,7 +286,7 @@ with col_mid:
         btc_data = get_coin_data(btc_id, curr)
         
         if user_data == "LIMIT" or btc_data == "LIMIT":
-            st.warning("⚠️ **API Limiti:** Çok hızlı işlem yaptınız. Lütfen 1 dakika bekleyip sayfayı yenileyin.")
+            st.warning("⚠️ **API Limiti:** Çok hızlı işlem yaptınız. Lütfen 1 dakika bekleyin.")
         
         elif user_data and btc_data:
             c_chart1, c_chart2 = st.columns(2)
@@ -343,23 +368,99 @@ with col_mid:
         else:
             st.warning(f"⚠️ '{raw_input}' bulunamadı veya API limitine takıldı.")
 
+    # ==========================
+    # MOD 2: PORTAL (YENİ DÜZEN)
+    # ==========================
     else:
-        st.title("🌍 NEXUS GLOBAL PORTAL")
-        st.info("Küresel veriler yakında.")
+        # 1. TOP 10 ŞERİDİ
+        st.markdown(f"<h3 style='color:{st.session_state.theme_color}'>🏆 TOP 10 COIN (ANLIK)</h3>", unsafe_allow_html=True)
+        top10 = get_top10_coins(st.session_state.currency)
+        curr_sym = "$" if st.session_state.currency == 'usd' else "₺"
+        
+        if top10:
+            cols_top = st.columns(5) # 5'erli 2 satır gibi gösteririz veya kayarız
+            for idx, coin in enumerate(top10[:5]): # İlk 5'i gösterelim sığması için
+                chg = coin.get('price_change_percentage_24h', 0)
+                color = "#16c784" if chg > 0 else "#ea3943"
+                with cols_top[idx]:
+                    st.markdown(f"""
+                    <div style="background-color: #1E1E1E; padding: 10px; border-radius: 8px; text-align: center; border: 1px solid #333;">
+                        <img src="{coin['image']}" width="30">
+                        <div style="font-weight: bold; margin-top:5px;">{coin['symbol'].upper()}</div>
+                        <div style="font-size: 14px;">{curr_sym}{coin['current_price']}</div>
+                        <div style="color: {color}; font-size: 12px;">%{chg:.2f}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            st.markdown("---")
+        else:
+            st.warning("Top 10 Verisi Alınamadı")
 
-# SAĞ PANEL
-with col_right:
-    with st.container(border=True):
-        st.markdown("#### ⚙️ Ayarlar")
-        curr_opt = st.selectbox("Para Birimi", ["USD", "TRY", "EUR"], label_visibility="collapsed")
-        st.session_state.currency = curr_opt.lower()
-        st.markdown("<br>", unsafe_allow_html=True)
-        thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
-        st.session_state.theme_color = THEMES[thm]
-        st.markdown("---")
-        target = user_coin_id if 'user_coin_id' in locals() else 'bitcoin'
-        st.markdown(f"#### 📰 Haberler")
-        news = get_news(target)
-        if news:
-            for n in news:
-                st.markdown(f"<div style='background-color: #262730; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 12px;'><a href='{n['link']}' style='color: white; text-decoration: none;'>{n['title']}</a></div>", unsafe_allow_html=True)
+        # 2. İKİLİ KOLON: HABERLER (SOL) - SOSYAL (SAĞ)
+        c_news, c_social = st.columns([1, 1])
+        
+        # --- HABERLER ---
+        with c_news:
+            st.subheader("📰 PİYASA GÜNDEMİ")
+            # Genel piyasa haberlerini çek
+            news_items = get_news("crypto market bitcoin economy")
+            with st.container(height=600): # Scroll edilebilir alan
+                if news_items:
+                    for n in news_items:
+                        st.markdown(f"""
+                        <div class="news-card">
+                            <a href="{n['link']}" target="_blank" style="text-decoration: none; color: white; font-weight: bold; font-size: 16px;">{n['title']}</a>
+                            <br><span style="color: gray; font-size: 12px;">Kaynak: Google News</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.info("Haber akışı güncelleniyor...")
+
+        # --- SOSYAL (FORUM) ---
+        with c_social:
+            st.subheader("💬 NEXUS TOPLULUK")
+            
+            # Yazı Yazma Alanı
+            with st.container(border=True):
+                user_msg = st.text_input("Ne düşünüyorsun?", placeholder="Fikirlerini paylaş...")
+                if st.button("PAYLAŞ", use_container_width=True):
+                    if user_msg:
+                        new_post = {
+                            "user": "Misafir", 
+                            "msg": user_msg, 
+                            "time": datetime.datetime.now().strftime("%H:%M")
+                        }
+                        # Listeyi başa ekle (En yeni en üstte)
+                        st.session_state.posts.insert(0, new_post)
+                        st.rerun()
+
+            # Akış Alanı
+            with st.container(height=450): # Scroll edilebilir alan
+                for p in st.session_state.posts:
+                    st.markdown(f"""
+                    <div class="social-card">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="color: {st.session_state.theme_color}; font-weight: bold;">@{p['user']}</span>
+                            <span style="color: gray; font-size: 12px;">{p['time']}</span>
+                        </div>
+                        <div style="color: #ddd;">{p['msg']}</div>
+                        <div style="margin-top: 10px; font-size: 18px;">❤️ 🔁</div> 
+                    </div>
+                    """, unsafe_allow_html=True)
+
+# --- SAĞ PANEL (SADECE TERMINAL MODUNDA VAR) ---
+if col_right:
+    with col_right:
+        with st.container(border=True):
+            st.markdown("#### ⚙️ Ayarlar")
+            curr_opt = st.selectbox("Para Birimi", ["USD", "TRY", "EUR"], label_visibility="collapsed")
+            st.session_state.currency = curr_opt.lower()
+            st.markdown("<br>", unsafe_allow_html=True)
+            thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
+            st.session_state.theme_color = THEMES[thm]
+            st.markdown("---")
+            target = user_coin_id if 'user_coin_id' in locals() else 'bitcoin'
+            st.markdown(f"#### 📰 {target.upper()} Haberleri")
+            news = get_news(target)
+            if news:
+                for n in news:
+                    st.markdown(f"<div style='background-color: #262730; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 12px;'><a href='{n['link']}' style='color: white; text-decoration: none;'>{n['title']}</a></div>", unsafe_allow_html=True)
