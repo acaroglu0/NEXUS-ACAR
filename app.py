@@ -4,6 +4,7 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 import time
+import os
 
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
@@ -102,45 +103,36 @@ def get_model():
 
 # --- DAYANIKLI VERİ MOTORU ---
 
-@st.cache_data(ttl=3600) # Aramayı 1 saat hatırla (API Tasarrufu)
+@st.cache_data(ttl=3600) 
 def search_coin_id(query):
     try:
         url = f"https://api.coingecko.com/api/v3/search?query={query}"
-        # Timeout ekledik, donarsa 5 saniyede iptal et
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()
         coins = r.get('coins', [])
-        
         if not coins: return None
-        
-        # Tam sembol eşleşmesi (btc -> bitcoin, sol -> solana)
         for coin in coins:
             if coin['symbol'].lower() == query.lower():
                 return coin['id']
-                
         return coins[0]['id']
     except: return None
 
-@st.cache_data(ttl=60) # Fiyatları 1 dakika hatırla
+@st.cache_data(ttl=60)
 def get_coin_data(coin_id, currency):
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}&include_24hr_change=true"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-        
-        # API LİMİT KONTROLÜ (429 Hatası)
-        if r.status_code == 429:
-            return "LIMIT"
-            
+        if r.status_code == 429: return "LIMIT"
         data = r.json()
-        if coin_id in data:
-            return data[coin_id]
+        if coin_id in data: return data[coin_id]
     except: return None
     return None
 
-@st.cache_data(ttl=14400) # 4 SAAT CACHE
+# GÜNCELLEME: GLOBAL VERİ ARTIK 24 SAAT (86400 SN) CACHE'DE TUTULUYOR
+@st.cache_data(ttl=86400) 
 def get_global_data():
     try:
         url = "https://api.coingecko.com/api/v3/global"
-        return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}).json()['data']
+        return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()['data']
     except: return None
 
 @st.cache_data(ttl=300)
@@ -149,10 +141,8 @@ def get_chart_data(coin_id, currency, days):
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency={currency}&days={days}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r.status_code != 200: return pd.DataFrame()
-        
         data = r.json()
         if 'prices' not in data: return pd.DataFrame()
-        
         df = pd.DataFrame(data['prices'], columns=['time', 'price'])
         df['time'] = pd.to_datetime(df['time'], unit='ms')
         return df
@@ -171,7 +161,6 @@ def get_news(coin_name):
 # --- GRAFİK ---
 def create_mini_chart(df, price_change, currency_symbol, height=350):
     fig = go.Figure()
-    
     if df.empty:
         fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                           xaxis=dict(visible=False), yaxis=dict(visible=False),
@@ -209,7 +198,12 @@ col_left, col_mid, col_right = st.columns([1, 4, 1])
 # SOL PANEL
 with col_left:
     with st.container(border=True):
-        st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
+        # LOGO KONTROLÜ
+        if os.path.exists("logo.png"):
+            st.image("logo.png", use_container_width=True)
+        else:
+            st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
+            
         st.markdown("---")
         
         st.caption("🔍 **KRİPTO SEÇ**")
@@ -243,11 +237,9 @@ with col_mid:
         curr = st.session_state.currency
         curr_sym = "$" if curr == 'usd' else "₺" if curr == 'try' else "€"
         
-        # 1. COIN VERİSİNİ ÇEKMEYE ÇALIŞ
         user_coin_id = raw_input
         user_data = get_coin_data(user_coin_id, curr)
         
-        # 2. BULAMAZSA VEYA HATA VARSA
         if user_data is None:
             found_id = search_coin_id(raw_input)
             if found_id:
@@ -256,15 +248,12 @@ with col_mid:
 
         btc_data = get_coin_data(btc_id, curr)
         
-        # API LİMİT KONTROLÜ
         if user_data == "LIMIT" or btc_data == "LIMIT":
-            st.warning("⚠️ **API Limiti:** Çok hızlı işlem yaptınız. Veri sağlayıcı (CoinGecko) kısa süreliğine yanıt vermiyor. Lütfen 1 dakika bekleyip sayfayı yenileyin.")
+            st.warning("⚠️ **API Limiti:** Çok hızlı işlem yaptınız. Lütfen 1 dakika bekleyip sayfayı yenileyin.")
         
-        # NORMALSE DEVAM ET
         elif user_data and btc_data:
             c_chart1, c_chart2 = st.columns(2)
             
-            # SOL GRAFİK
             with c_chart1:
                 u_change = user_data.get(f'{curr}_24h_change', 0)
                 u_color = "#ea3943" if u_change < 0 else "#16c784"
@@ -274,7 +263,6 @@ with col_mid:
                 u_df = get_chart_data(user_coin_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="user_chart")
 
-            # SAĞ GRAFİK
             with c_chart2:
                 b_change = btc_data.get(f'{curr}_24h_change', 0)
                 b_color = "#ea3943" if b_change < 0 else "#16c784"
@@ -284,7 +272,6 @@ with col_mid:
                 b_df = get_chart_data(btc_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(b_df, b_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="btc_chart")
 
-            # ALT KOKPİT
             c_bot1, c_bot2, c_bot3 = st.columns(3)
             with c_bot1:
                 with st.container(border=True):
@@ -296,7 +283,7 @@ with col_mid:
                              with st.spinner(".."):
                                  try:
                                      m = get_model()
-                                     r = m.generate_content(f"Coin: {user_coin_id}. Soru: {user_q}. Kısa cevapla.")
+                                     r = m.generate_content(f"Coin: {user_coin_id}. Fiyat: {user_data[curr]}. Soru: {user_q}. Kısa cevapla.")
                                      st.info(r.text)
                                  except: pass
 
@@ -315,9 +302,8 @@ with col_mid:
                         if total_cap > 1_000_000_000_000: t_fmt = f"{total_cap/1_000_000_000_000:.2f} T"
                         else: t_fmt = f"{total_cap/1_000_000_000:.2f} B"
                         st.markdown(f"""<div class="box-content"><h3 style="color: gray; margin: 0; font-size: 13px;">GLOBAL MARKET CAP</h3><h1 style="color: white; margin: 5px 0; font-size: 26px;">{curr_sym}{t_fmt}</h1><h3 style="color: {t_color}; margin: 0; font-size: 18px;">{arrow} %{total_change:.2f}</h3></div>""", unsafe_allow_html=True)
-                    else: st.caption("Veri yükleniyor...")
+                    else: st.caption("Veri güncelleniyor...")
             
-            # --- ANALİZ RAPORU (EMOJİSİZ & RENKLİ) ---
             if analyze_btn:
                  st.markdown("---")
                  st.subheader(f"🧠 NEXUS: Detaylı Rapor")
@@ -327,18 +313,11 @@ with col_mid:
                          try:
                              model = get_model()
                              price_now = user_data[curr]
-                             
                              structured_prompt = f"""
                              Sen uzman bir kripto analistisin. Coin: {user_coin_id.upper()}. Fiyat: {price_now} {curr.upper()}.
-                             
                              Analizi şu 3 başlıkta yap (Dil: {st.session_state.language}):
-                             
-                             **1. GENEL BAKIŞ & HABERLER**
-                             (Proje ve piyasa algısı özeti)
-                             
-                             **2. RİSK ANALİZİ**
-                             (Risk durumu)
-                             
+                             **1. GENEL BAKIŞ & HABERLER** (Proje ve piyasa algısı özeti)
+                             **2. RİSK ANALİZİ** (Risk durumu)
                              **3. FİYAT TAHMİNİ (ÖNEMLİ)**
                              * Teknik analiz özeti.
                              * **KISA VADE (1-3 GÜN):** Tahminini tam olarak şu HTML formatında yaz (Emoji KULLANMA, sadece yazı):
@@ -346,12 +325,10 @@ with col_mid:
                                <span style='color:#ea3943; font-size:24px; font-weight:bold;'>%X.XX DÜŞÜŞ</span> (Eğer düşüşse)
                              * **UZUN VADE:** Beklentini yaz.
                              """
-                             
                              res = model.generate_content(structured_prompt)
                              st.markdown(res.text, unsafe_allow_html=True)
                          except: st.error("Bağlantı hatası.")
         else:
-            # Bulunamazsa
             st.warning(f"⚠️ '{raw_input}' bulunamadı veya API limitine takıldı.")
 
     else:
