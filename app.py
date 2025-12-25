@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import time
 import os
 import datetime
-import base64 # Logo için gerekli
+import base64
 
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
@@ -113,7 +113,7 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    /* LOGO VE BAŞLIK STİLİ (Çizime uygun) */
+    /* LOGO VE BAŞLIK STİLİ (YENİDEN DÜZENLENDİ - Büyük ve Hizalı) */
     .logo-container {{
         display: flex;
         align-items: center; /* Dikey ortalama */
@@ -121,18 +121,18 @@ st.markdown(f"""
         margin-bottom: 20px;
     }}
     .logo-img {{
-        width: 70px; /* Logo boyutu */
+        width: 80px; /* Logo boyutu büyütüldü */
         height: auto;
         margin-right: 15px; /* Yazı ile logo arası boşluk */
-        border-radius: 12px; /* İsteğe bağlı: köşeleri yuvarlatma */
+        border-radius: 12px; 
     }}
     .logo-text {{
         color: {st.session_state.theme_color};
         margin: 0;
-        font-size: 32px; /* Yazı boyutu büyütüldü */
+        font-size: 36px; /* Yazı boyutu büyütüldü */
         font-weight: 900;
         letter-spacing: 2px;
-        line-height: 1; /* Dikey hizalamayı iyileştirir */
+        line-height: 1; 
     }}
 
 </style>
@@ -260,7 +260,7 @@ col_right = cols[2] if len(cols) > 2 else None
 # --- SOL PANEL (NAVİGASYON) ---
 with col_nav:
     with st.container(border=True):
-        # LOGO & BAŞLIK (YENİ DÜZEN - ÇİZİME UYGUN)
+        # LOGO & BAŞLIK (YENİDEN DÜZENLENDİ - Büyük ve Hizalı)
         if logo_base64:
             st.markdown(f"""
             <div class="logo-container">
