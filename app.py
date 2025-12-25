@@ -113,26 +113,29 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
 
-    /* LOGO VE BAŞLIK STİLİ (REVİZE EDİLDİ) */
+    /* LOGO VE BAŞLIK STİLİ (FIXED: TEK SATIR GARANTİSİ) */
     .logo-container {{
         display: flex;
-        align-items: center; /* Dikey ortalama */
-        justify-content: flex-start; /* Sola dayalı */
+        align-items: center; 
+        justify-content: flex-start;
         margin-bottom: 20px;
+        flex-wrap: nowrap; /* Asla alt satıra geçme */
     }}
     .logo-img {{
-        width: 75px; /* Logo hafif küçültüldü */
+        width: 60px; /* Sütuna sığması için ideal boyut */
         height: auto;
-        margin-right: 15px;
-        border-radius: 12px; 
+        margin-right: 12px;
+        border-radius: 10px;
+        flex-shrink: 0; /* Logonun ezilmesini engelle */
     }}
     .logo-text {{
         color: {st.session_state.theme_color};
         margin: 0;
-        font-size: 30px; /* Yazı boyutu küçültüldü (36 -> 30) */
+        font-size: 26px; /* Sığması için ideal font */
         font-weight: 900;
-        letter-spacing: 2px;
-        line-height: 1; 
+        letter-spacing: 1px;
+        line-height: 1;
+        white-space: nowrap; /* SİHİRLİ KOD: Asla alt satıra inme! */
     }}
 
 </style>
@@ -260,7 +263,7 @@ col_right = cols[2] if len(cols) > 2 else None
 # --- SOL PANEL (NAVİGASYON) ---
 with col_nav:
     with st.container(border=True):
-        # LOGO & BAŞLIK (YENİDEN DÜZENLENDİ - Büyük ve Hizalı)
+        # LOGO & BAŞLIK (DÜZELTİLDİ: TEK SATIR)
         if logo_base64:
             st.markdown(f"""
             <div class="logo-container">
