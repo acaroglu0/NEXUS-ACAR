@@ -198,10 +198,22 @@ col_left, col_mid, col_right = st.columns([1, 4, 1])
 # SOL PANEL
 with col_left:
     with st.container(border=True):
-        # LOGO KONTROLÜ
-        if os.path.exists("logo.png"):
-            st.image("logo.png", use_container_width=True)
+        # --- LOGO ve BAŞLIK ALANI (JPEG Desteği) ---
+        if os.path.exists("logo.jpeg"):
+            # Yan yana iki sütun: Logo (dar) ve Yazı (geniş)
+            c_logo, c_text = st.columns([1, 3]) 
+            with c_logo:
+                 # Logoyu göster (genişliği sabitledik)
+                 st.image("logo.jpeg", width=70)
+            with c_text:
+                 # Şık, ortalanmış, tema renginde yazı
+                 st.markdown(f"""
+                 <div style='display: flex; align-items: center; height: 100%;'>
+                     <h1 style='color: {st.session_state.theme_color}; margin:0; font-size: 28px; font-weight: 900; letter-spacing: 2px;'>NEXUS</h1>
+                 </div>
+                 """, unsafe_allow_html=True)
         else:
+            # Logo yoksa eski usul devam
             st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
             
         st.markdown("---")
