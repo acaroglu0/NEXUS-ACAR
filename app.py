@@ -101,14 +101,14 @@ def get_model():
 
 # --- AKILLI ARAMA & VERİ ÇEKME ---
 
-@st.cache_data(ttl=86400) # Bir gün boyunca arama sonucunu hatırla
+@st.cache_data(ttl=86400) # Aramayı önbelleğe al
 def search_coin_id(query):
-    # Eğer kullanıcı "sol" yazarsa bunu "solana" ID'sine çeviren fonksiyon
+    # Kullanıcı "sol" yazarsa bunu API'de arayıp "solana" id'sini döndüren fonksiyon
     try:
         url = f"https://api.coingecko.com/api/v3/search?query={query}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}).json()
         if r.get('coins'):
-            # En üstteki sonucu döndür (Genelde en popüler olanıdır)
+            # En alakalı ilk sonucu al
             return r['coins'][0]['id']
     except: return None
     return None
@@ -215,18 +215,17 @@ with col_left:
 with col_mid:
     if st.session_state.app_mode == "TERMINAL":
         
-        # 1. GİRİLEN METNİ TEMİZLE
+        # 1. GİRDİ İŞLEME VE AKILLI ARAMA
         raw_input = coin_input.lower().strip()
         btc_id = "bitcoin"
         curr = st.session_state.currency
         curr_sym = "$" if curr == 'usd' else "₺" if curr == 'try' else "€"
         
-        # 2. AKILLI ARAMA ALGORİTMASI
-        # Önce direkt girilen ismi dene (örn: bitcoin)
+        # Arama Başlıyor...
         user_coin_id = raw_input
         user_data = get_coin_data(user_coin_id, curr)
         
-        # Eğer veri gelmezse, "Search API" ile doğrusunu bul (örn: sol -> solana)
+        # Eğer direkt bulamazsa (örn: "sol"), akıllı arama devreye girer
         if not user_data:
             found_id = search_coin_id(raw_input)
             if found_id:
@@ -238,28 +237,31 @@ with col_mid:
         if user_data and btc_data:
             c_chart1, c_chart2 = st.columns(2)
             
-            # KULLANICI GRAFİĞİ
+            # SOL ÜST GRAFİK (KULLANICI SEÇİMİ)
             with c_chart1:
                 u_change = user_data.get(f'{curr}_24h_change', 0)
                 u_color = "#ea3943" if u_change < 0 else "#16c784"
                 cl1, cl2 = st.columns([1, 1])
                 cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
+                
                 u_df = get_chart_data(user_coin_id, curr, days_api)
                 if not u_df.empty:
                     st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
 
-            # BTC GRAFİĞİ
+            # SAĞ ÜST GRAFİK (BITCOIN - SABİT)
             with c_chart2:
                 b_change = btc_data.get(f'{curr}_24h_change', 0)
                 b_color = "#ea3943" if b_change < 0 else "#16c784"
                 cr1, cr2 = st.columns([1, 1])
                 cr1.markdown(f"<h2 style='margin:0;'>BITCOIN</h2>", unsafe_allow_html=True)
                 cr2.markdown(f"<h3 style='text-align:right; color:{b_color}; margin:0;'>{curr_sym}{btc_data[curr]:,.2f} (%{b_change:.2f})</h3>", unsafe_allow_html=True)
+                
                 b_df = get_chart_data(btc_id, curr, days_api)
                 if not b_df.empty:
                     st.plotly_chart(create_mini_chart(b_df, b_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
 
+            # ALT KISIM (3 KUTU)
             c_bot1, c_bot2, c_bot3 = st.columns(3)
             with c_bot1:
                 with st.container(border=True):
@@ -305,7 +307,8 @@ with col_mid:
                              st.markdown(res.text)
                          except: st.error("Bağlantı hatası.")
         else:
-            st.warning(f"⚠️ '{raw_input}' bulunamadı. Lütfen tam adını yazmayı deneyin (Örn: solana, avalanche).")
+            # BULUNAMAZSA UYARI
+            st.warning(f"⚠️ '{raw_input}' bulunamadı. Lütfen tam adını yazın (Örn: solana, avalanche).")
 
     else:
         st.title("🌍 NEXUS GLOBAL PORTAL")
