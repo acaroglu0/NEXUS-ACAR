@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import time
 import os
 import datetime
+import base64 # Logo için gerekli
 
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
@@ -28,6 +29,16 @@ THEMES = {
     "Siber Mor 🟣": "#BC13FE",
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
+
+# --- LOGO YÜKLEME FONSİYONU ---
+def get_base64_of_bin_file(bin_file):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+logo_path = "logo.jpeg"
+logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else None
+
 
 # --- 2. CSS ---
 st.markdown(f"""
@@ -101,6 +112,29 @@ st.markdown(f"""
         margin-top: 5px;
         margin-bottom: 10px;
     }}
+
+    /* LOGO VE BAŞLIK STİLİ (Çizime uygun) */
+    .logo-container {{
+        display: flex;
+        align-items: center; /* Dikey ortalama */
+        justify-content: flex-start; /* Sola dayalı */
+        margin-bottom: 20px;
+    }}
+    .logo-img {{
+        width: 70px; /* Logo boyutu */
+        height: auto;
+        margin-right: 15px; /* Yazı ile logo arası boşluk */
+        border-radius: 12px; /* İsteğe bağlı: köşeleri yuvarlatma */
+    }}
+    .logo-text {{
+        color: {st.session_state.theme_color};
+        margin: 0;
+        font-size: 32px; /* Yazı boyutu büyütüldü */
+        font-weight: 900;
+        letter-spacing: 2px;
+        line-height: 1; /* Dikey hizalamayı iyileştirir */
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -139,7 +173,7 @@ def get_coin_data(coin_id, currency):
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}&include_24hr_change=true"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-        if r.status_code != 200: return "LIMIT" # Hata kodu dönerse LIMIT de
+        if r.status_code != 200: return "LIMIT"
         data = r.json()
         if coin_id in data: return data[coin_id]
     except: return None
@@ -154,13 +188,12 @@ def get_global_data():
 
 @st.cache_data(ttl=300)
 def get_top10_coins(currency):
-    # CRASH FIX: Eğer API hata verirse boş liste dön, ÇÖKME!
     try:
         url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency={currency}&order=market_cap_desc&per_page=10&page=1&sparkline=false"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r.status_code != 200: return [] 
         data = r.json()
-        if isinstance(data, list): return data # Sadece liste gelirse kabul et
+        if isinstance(data, list): return data
         return []
     except: return []
 
@@ -218,7 +251,6 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     return fig
 
 # --- EKRAN DÜZENİ MANTIĞI ---
-# Terminal modunda 3 sütun (1-4-1), Portal modunda 2 sütun (1-5)
 layout_cols = [1, 4, 1] if st.session_state.app_mode == "TERMINAL" else [1, 5]
 cols = st.columns(layout_cols)
 col_nav = cols[0]
@@ -228,14 +260,14 @@ col_right = cols[2] if len(cols) > 2 else None
 # --- SOL PANEL (NAVİGASYON) ---
 with col_nav:
     with st.container(border=True):
-        # LOGO & BAŞLIK (DÜZELTİLDİ)
-        if os.path.exists("logo.jpeg"):
-            c_logo, c_text = st.columns([1.2, 3]) 
-            with c_logo: st.image("logo.jpeg", width=90)
-            with c_text: 
-                 st.markdown(f"""<div style='display: flex; align-items: center; height: 100%; margin-left: 15px;'>
-                     <h1 style='color: {st.session_state.theme_color}; margin:0; font-size: 28px; font-weight: 900; letter-spacing: 2px;'>NEXUS</h1>
-                 </div>""", unsafe_allow_html=True)
+        # LOGO & BAŞLIK (YENİ DÜZEN - ÇİZİME UYGUN)
+        if logo_base64:
+            st.markdown(f"""
+            <div class="logo-container">
+                <img src="data:image/jpeg;base64,{logo_base64}" class="logo-img">
+                <h1 class="logo-text">NEXUS</h1>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
             
