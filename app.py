@@ -11,17 +11,17 @@ import base64
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
 
-# SESSION STATE
+# SESSION STATE (VARSAYILAN COIN ARTIK KESİN ETHEREUM)
 if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931A'
 if 'currency' not in st.session_state: st.session_state.currency = 'usd'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'app_mode' not in st.session_state: st.session_state.app_mode = 'TERMINAL'
-if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' # DEFAULT ETH
+if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' # DÜZELTİLDİ
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS Portal stabil sürüme döndü.", "time": "10:00"},
-        {"user": "Trader_01", "msg": "ETH grafiği harika görünüyor.", "time": "10:05"}
+        {"user": "Admin 🦁", "msg": "NEXUS Portal v11.4 Yayında! Açılış artık Ethereum.", "time": "09:00"},
+        {"user": "Trader_01", "msg": "Tablo efsane olmuş, tam CMC gibi.", "time": "09:15"}
     ]
 
 THEMES = {
@@ -62,7 +62,7 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
     
-    /* CMC TARZI TABLO */
+    /* CMC TARZI GELİŞMİŞ TABLO */
     .coin-header {{
         display: flex;
         justify-content: space-between;
@@ -102,7 +102,7 @@ st.markdown(f"""
         .coin-name {{ font-size: 13px; }}
     }}
 
-    /* LOGO DUZENİ */
+    /* LOGO */
     .logo-container {{
         display: flex;
         align-items: center; 
@@ -234,7 +234,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     if df.empty:
         fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                           xaxis=dict(visible=False), yaxis=dict(visible=False),
-                          annotations=[dict(text="Veri Yok", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
+                          annotations=[dict(text="Veri Yok (API Limiti)", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
         return fig
 
     main_color = '#ea3943' if price_change < 0 else '#16c784'
@@ -276,7 +276,9 @@ with col_nav:
         st.markdown("---")
         
         if st.session_state.app_mode == "TERMINAL":
+            # 1. ÖNCE MANUEL ARAMA VE BUTON
             st.caption("🔍 **KRİPTO SEÇ**")
+            # DEFAULT DEĞER ARTIK 'ethereum' (SESSION STATE'DEN GELİYOR)
             coin_input = st.text_input("Coin Ara:", st.session_state.selected_coin, label_visibility="collapsed")
             if coin_input != st.session_state.selected_coin:
                 st.session_state.selected_coin = coin_input
@@ -285,6 +287,8 @@ with col_nav:
             analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
             
             st.markdown("---")
+            
+            # 2. SONRA HIZLI ERİŞİM (ALTTA)
             st.caption("🚀 **HIZLI ERİŞİM (TOP 10)**")
             top10_data = get_top10_coins(st.session_state.currency)
             
@@ -333,9 +337,11 @@ with col_main:
         curr = st.session_state.currency
         curr_sym = "$" if curr == 'usd' else "₺" if curr == 'try' else "€"
         
+        # KULLANICI COIN VERİSİ (Şimdi varsayılan olarak ETH gelecek)
         user_coin_id = raw_input
         user_data = get_coin_data(user_coin_id, curr)
         
+        # Eğer "ethereum" bile bulunamazsa API'den ara
         if user_data is None:
             found_id = search_coin_id(raw_input)
             if found_id:
@@ -484,4 +490,37 @@ with col_main:
             news_items = get_news("crypto market")
             with st.container(height=500):
                 if news_items:
-                    for n
+                    for n in news_items:
+                        st.markdown(f"""<div class="news-card"><a href="{n['link']}" target="_blank" style="text-decoration: none; color: white; font-weight: bold;">{n['title']}</a></div>""", unsafe_allow_html=True)
+                else: st.info("Haberler yükleniyor...")
+
+        with c_social:
+            st.subheader("💬 TOPLULUK")
+            with st.container(border=True):
+                user_msg = st.text_input("Yorum Yaz:", placeholder="Düşüncelerin...")
+                if st.button("PAYLAŞ", use_container_width=True):
+                    if user_msg:
+                        st.session_state.posts.insert(0, {"user": "Misafir", "msg": user_msg, "time": datetime.datetime.now().strftime("%H:%M")})
+                        st.rerun()
+
+            with st.container(height=380):
+                for p in st.session_state.posts:
+                    st.markdown(f"""<div class="social-card"><span style="color:{st.session_state.theme_color}; font-weight:bold;">@{p['user']}</span> <span style="color:gray; font-size:10px;">{p['time']}</span><br>{p['msg']}</div>""", unsafe_allow_html=True)
+
+# --- SAĞ PANEL (SADECE TERMINAL) ---
+if col_right:
+    with col_right:
+        with st.container(border=True):
+            st.markdown("#### ⚙️ Ayarlar")
+            curr_opt = st.selectbox("Para Birimi", ["USD", "TRY", "EUR"], label_visibility="collapsed")
+            st.session_state.currency = curr_opt.lower()
+            st.markdown("<br>", unsafe_allow_html=True)
+            thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
+            st.session_state.theme_color = THEMES[thm]
+            st.markdown("---")
+            target = user_coin_id if 'user_coin_id' in locals() else 'bitcoin'
+            st.markdown(f"#### 📰 Haberler")
+            news = get_news(target)
+            if news:
+                for n in news:
+                    st.markdown(f"<div style='background-color: #262730; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 12px;'><a href='{n['link']}' style='color: white; text-decoration: none;'>{n['title']}</a></div>", unsafe_allow_html=True)
