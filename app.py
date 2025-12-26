@@ -16,13 +16,12 @@ if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931
 if 'currency' not in st.session_state: st.session_state.currency = 'usd'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'app_mode' not in st.session_state: st.session_state.app_mode = 'TERMINAL'
-# VARSAYILAN COIN ARTIK ETHEREUM
 if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' 
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS Portal'a hoş geldiniz! Piyasa bugün hareketli.", "time": "09:00"},
-        {"user": "Trader_01", "msg": "ETH dominansı artıyor mu?", "time": "09:15"}
+        {"user": "Admin 🦁", "msg": "NEXUS Portal v11.3 Yayında! 1s ve 7g verileri eklendi.", "time": "09:00"},
+        {"user": "Trader_01", "msg": "Tablo efsane olmuş, tam CMC gibi.", "time": "09:15"}
     ]
 
 THEMES = {
@@ -63,7 +62,17 @@ st.markdown(f"""
         margin-bottom: 10px;
     }}
     
-    /* CMC TARZI TABLO SATIRI */
+    /* CMC TARZI GELİŞMİŞ TABLO */
+    .coin-header {{
+        display: flex;
+        justify-content: space-between;
+        color: gray;
+        font-size: 12px;
+        padding: 5px 10px;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }}
+    
     .coin-row {{
         display: flex;
         align-items: center;
@@ -78,10 +87,44 @@ st.markdown(f"""
     .coin-row:hover {{
         background-color: #252525;
     }}
+    
+    /* SOL KISIM: SIRA, LOGO, İSİM */
+    .row-left {{
+        display: flex;
+        align-items: center;
+        flex: 1.5; /* İsim alanı geniş olsun */
+    }}
     .coin-rank {{ color: gray; font-size: 12px; margin-right: 10px; min-width: 20px; }}
     .coin-name {{ font-weight: bold; color: white; margin-left: 10px; font-size: 15px; }}
-    .coin-price {{ font-family: monospace; font-size: 15px; text-align: right; }}
+    .coin-symbol {{ color: gray; font-size: 12px; margin-left: 5px; }}
+
+    /* SAĞ KISIM: FİYAT VE YÜZDELER (GRID GİBİ) */
+    .row-right {{
+        display: flex;
+        align-items: center;
+        flex: 2; /* Sağ taraf daha geniş */
+        justify-content: flex-end;
+    }}
+    .stat-col {{
+        width: 20%; /* Her sütuna eşit pay */
+        text-align: right;
+        font-size: 14px;
+    }}
+    .price-col {{
+        width: 30%;
+        text-align: right;
+        font-family: monospace;
+        font-weight: bold;
+        color: white;
+    }}
     
+    /* MOBİL İÇİN ÖZEL AYAR (Telefonda yazılar küçülsün taşmasın) */
+    @media only screen and (max-width: 600px) {{
+        .stat-col {{ font-size: 11px; width: 22%; }}
+        .price-col {{ font-size: 12px; width: 34%; }}
+        .coin-name {{ font-size: 13px; }}
+    }}
+
     /* LOGO */
     .logo-container {{
         display: flex;
@@ -113,7 +156,7 @@ st.markdown(f"""
         font-weight: 700 !important;
         font-size: 13px;
         text-transform: uppercase;
-        padding: 8px 0px; /* Rahatlatılmış padding */
+        padding: 8px 0px; 
     }}
     
     div.stButton > button[kind="primary"] {{
@@ -177,7 +220,8 @@ def get_global_data():
 @st.cache_data(ttl=300)
 def get_top10_coins(currency):
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency={currency}&order=market_cap_desc&per_page=10&page=1&sparkline=false"
+        # 1H ve 7D verisini de istiyoruz: price_change_percentage=1h,24h,7d
+        url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency={currency}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=1h,24h,7d"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r.status_code != 200: return [] 
         data = r.json()
@@ -272,13 +316,11 @@ with col_nav:
             top10_data = get_top10_coins(st.session_state.currency)
             
             if top10_data:
-                # 3 Kolonlu yapı (Yazılar sıkışmasın diye)
                 cols_quick = st.columns(3)
-                for i, coin in enumerate(top10_data[:10]): # İlk 10
-                    # Modulo operatörü ile 3 sütuna dağıtıyoruz
+                for i, coin in enumerate(top10_data[:10]):
                     if cols_quick[i % 3].button(coin['symbol'].upper(), key=f"qbtn_{coin['id']}"):
                         st.session_state.selected_coin = coin['id']
-                        st.rerun() # Sayfayı yenile ki input güncellensin
+                        st.rerun()
             else:
                 st.caption("Liste yükleniyor...")
 
@@ -412,28 +454,53 @@ with col_main:
         else:
             st.warning(f"⚠️ '{raw_input}' bulunamadı.")
 
-    # --- MOD 2: PORTAL (CMC TARZI LİSTE) ---
+    # --- MOD 2: PORTAL (CMC TARZI LİSTE - GELİŞMİŞ) ---
     else:
         st.markdown(f"<h3 style='color:{st.session_state.theme_color}'>🏆 TOP 10 PIYASA</h3>", unsafe_allow_html=True)
         top10 = get_top10_coins(st.session_state.currency)
         curr_sym = "$" if st.session_state.currency == 'usd' else "₺"
         
         if top10:
+            # BAŞLIK SATIRI (HEADER)
+            st.markdown(f"""
+            <div class="coin-header">
+                <div style="flex:1.5;">COIN</div>
+                <div style="flex:2; display:flex; justify-content:flex-end;">
+                    <div style="width:30%; text-align:right;">FIYAT</div>
+                    <div style="width:20%; text-align:right;">1s</div>
+                    <div style="width:20%; text-align:right;">24s</div>
+                    <div style="width:20%; text-align:right;">7g</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
             for idx, coin in enumerate(top10[:10]): 
-                chg = coin.get('price_change_percentage_24h', 0)
-                color = "#16c784" if chg > 0 else "#ea3943"
-                arrow = "▲" if chg > 0 else "▼"
+                # Fiyatlar
+                p = coin['current_price']
+                price_fmt = f"{curr_sym}{p:,.2f}" if p > 1 else f"{curr_sym}{p:.6f}"
+                
+                # Yüzdeler (API bazen boş dönebilir, kontrol edelim)
+                p1 = coin.get('price_change_percentage_1h_in_currency') or 0
+                p24 = coin.get('price_change_percentage_24h_in_currency') or 0
+                p7 = coin.get('price_change_percentage_7d_in_currency') or 0
+                
+                # Renkler
+                c1 = "#16c784" if p1 > 0 else "#ea3943"
+                c24 = "#16c784" if p24 > 0 else "#ea3943"
+                c7 = "#16c784" if p7 > 0 else "#ea3943"
+
                 st.markdown(f"""
                 <div class="coin-row">
-                    <div style="display:flex; align-items:center;">
+                    <div class="row-left">
                         <span class="coin-rank">{idx+1}</span>
                         <img src="{coin['image']}" width="24" height="24">
                         <span class="coin-name">{coin['symbol'].upper()}</span>
-                        <span style="color:gray; font-size:12px; margin-left:5px;">{coin['name']}</span>
                     </div>
-                    <div>
-                        <div class="coin-price">{curr_sym}{coin['current_price']:,}</div>
-                        <div style="color:{color}; text-align:right; font-size:12px; font-weight:bold;">{arrow} %{chg:.2f}</div>
+                    <div class="row-right">
+                        <div class="price-col">{price_fmt}</div>
+                        <div class="stat-col" style="color:{c1};">%{p1:.1f}</div>
+                        <div class="stat-col" style="color:{c24};">%{p24:.1f}</div>
+                        <div class="stat-col" style="color:{c7};">%{p7:.1f}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
