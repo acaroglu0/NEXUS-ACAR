@@ -16,11 +16,13 @@ if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931
 if 'currency' not in st.session_state: st.session_state.currency = 'usd'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'app_mode' not in st.session_state: st.session_state.app_mode = 'TERMINAL'
-if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'bitcoin' # Varsayılan
+# VARSAYILAN COIN ARTIK ETHEREUM
+if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' 
+
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS Portal'a hoş geldiniz! Mobil uyumluluk devrede.", "time": "09:00"},
-        {"user": "Trader_01", "msg": "Mobilden giren var mı? Arayüz çok temiz olmuş.", "time": "09:15"}
+        {"user": "Admin 🦁", "msg": "NEXUS Portal'a hoş geldiniz! Piyasa bugün hareketli.", "time": "09:00"},
+        {"user": "Trader_01", "msg": "ETH dominansı artıyor mu?", "time": "09:15"}
     ]
 
 THEMES = {
@@ -40,7 +42,7 @@ def get_base64_of_bin_file(bin_file):
 logo_path = "logo.jpeg"
 logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else None
 
-# --- 2. CSS (MOBİL & CMC TARZI) ---
+# --- 2. CSS ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
@@ -80,7 +82,7 @@ st.markdown(f"""
     .coin-name {{ font-weight: bold; color: white; margin-left: 10px; font-size: 15px; }}
     .coin-price {{ font-family: monospace; font-size: 15px; text-align: right; }}
     
-    /* LOGO (Fixed: Tek Satır) */
+    /* LOGO */
     .logo-container {{
         display: flex;
         align-items: center; 
@@ -108,18 +110,18 @@ st.markdown(f"""
     div.stButton > button {{
         width: 100%;
         border-radius: 8px;
-        font-weight: 800 !important;
-        font-size: 12px; /* Buton yazısını biraz küçülttük sığsın diye */
+        font-weight: 700 !important;
+        font-size: 13px;
         text-transform: uppercase;
-        padding: 4px 0px;
+        padding: 8px 0px; /* Rahatlatılmış padding */
     }}
     
     div.stButton > button[kind="primary"] {{
         background-color: {st.session_state.theme_color};
         color: black;
         border: none;
-        font-size: 14px; /* Analiz butonu büyük kalsın */
-        padding: 8px 10px;
+        font-size: 14px;
+        font-weight: 900 !important;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -212,7 +214,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     if df.empty:
         fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                           xaxis=dict(visible=False), yaxis=dict(visible=False),
-                          annotations=[dict(text="Veri Yok", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
+                          annotations=[dict(text="Veri Yok (API Limiti)", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
         return fig
 
     main_color = '#ea3943' if price_change < 0 else '#16c784'
@@ -254,37 +256,32 @@ with col_nav:
         st.markdown("---")
         
         if st.session_state.app_mode == "TERMINAL":
-            st.caption("🏆 **HIZLI ERİŞİM (TOP 10)**")
-            
-            # OTOMATİK TOP 10 BUTONLARI
-            top10_data = get_top10_coins(st.session_state.currency)
-            if top10_data:
-                # İlk 5 (1. Satır)
-                c_row1 = st.columns(5)
-                for i in range(5):
-                    if i < len(top10_data):
-                        coin = top10_data[i]
-                        if c_row1[i].button(coin['symbol'].upper(), key=f"btn_{coin['id']}"):
-                            st.session_state.selected_coin = coin['id']
-                
-                # İkinci 5 (2. Satır)
-                c_row2 = st.columns(5)
-                for i in range(5, 10):
-                    if i < len(top10_data):
-                        coin = top10_data[i]
-                        if c_row2[i-5].button(coin['symbol'].upper(), key=f"btn_{coin['id']}"):
-                            st.session_state.selected_coin = coin['id']
-            else:
-                st.caption("Liste yükleniyor...")
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.caption("✍️ **VEYA YAZIN**")
+            # 1. ÖNCE MANUEL ARAMA VE BUTON
+            st.caption("🔍 **KRİPTO SEÇ**")
             coin_input = st.text_input("Coin Ara:", st.session_state.selected_coin, label_visibility="collapsed")
             if coin_input != st.session_state.selected_coin:
                 st.session_state.selected_coin = coin_input
             
             st.markdown("<br>", unsafe_allow_html=True)
             analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
+            
+            st.markdown("---")
+            
+            # 2. SONRA HIZLI ERİŞİM (ALTTA)
+            st.caption("🚀 **HIZLI ERİŞİM (TOP 10)**")
+            top10_data = get_top10_coins(st.session_state.currency)
+            
+            if top10_data:
+                # 3 Kolonlu yapı (Yazılar sıkışmasın diye)
+                cols_quick = st.columns(3)
+                for i, coin in enumerate(top10_data[:10]): # İlk 10
+                    # Modulo operatörü ile 3 sütuna dağıtıyoruz
+                    if cols_quick[i % 3].button(coin['symbol'].upper(), key=f"qbtn_{coin['id']}"):
+                        st.session_state.selected_coin = coin['id']
+                        st.rerun() # Sayfayı yenile ki input güncellensin
+            else:
+                st.caption("Liste yükleniyor...")
+
             st.markdown("---")
             st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
