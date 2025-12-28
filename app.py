@@ -16,12 +16,11 @@ if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931
 if 'currency' not in st.session_state: st.session_state.currency = 'usd'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'app_mode' not in st.session_state: st.session_state.app_mode = 'TERMINAL'
-if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' 
+if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' # Varsayılan ETH
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS v11.5 Yayında! API Koruması ve Akıllı Önbellek devrede.", "time": "10:00"},
-        {"user": "Trader_01", "msg": "Artık çok daha hızlı çalışıyor.", "time": "10:15"}
+        {"user": "Admin 🦁", "msg": "NEXUS v11.6 (Zırhlı Sürüm) devrede. Stabilite %100.", "time": "10:00"},
     ]
 
 THEMES = {
@@ -45,26 +44,98 @@ logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) els
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
-    .block-container {{ padding-top: 2rem; padding-bottom: 2rem; padding-left: 1rem; padding-right: 1rem; max-width: 100%; }}
-    .nexus-panel {{ background-color: #1E1E1E; padding: 10px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; }}
+    
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        max-width: 100%;
+    }}
+    
+    .nexus-panel {{
+        background-color: #1E1E1E;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        margin-bottom: 10px;
+    }}
     
     /* CMC TARZI TABLO */
-    .coin-header {{ display: flex; justify-content: space-between; color: gray; font-size: 12px; padding: 5px 10px; margin-bottom: 5px; font-weight: bold; }}
-    .coin-row {{ display: flex; align-items: center; justify-content: space-between; background-color: #151515; border-bottom: 1px solid #333; padding: 12px 10px; border-radius: 6px; margin-bottom: 5px; }}
-    .coin-row:hover {{ background-color: #252525; }}
+    .coin-header {{
+        display: flex;
+        justify-content: space-between;
+        color: gray;
+        font-size: 12px;
+        padding: 5px 10px;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }}
+    
+    .coin-row {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #151515;
+        border-bottom: 1px solid #333;
+        padding: 12px 10px;
+        transition: background 0.2s;
+        border-radius: 6px;
+        margin-bottom: 5px;
+    }}
+    .coin-row:hover {{
+        background-color: #252525;
+    }}
     
     .row-left {{ display: flex; align-items: center; flex: 1.5; }}
+    .coin-rank {{ color: gray; font-size: 12px; margin-right: 10px; min-width: 20px; }}
+    .coin-name {{ font-weight: bold; color: white; margin-left: 10px; font-size: 15px; }}
+    
     .row-right {{ display: flex; align-items: center; flex: 2; justify-content: flex-end; }}
-    .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
+    .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     
     /* LOGO */
-    .logo-container {{ display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; flex-wrap: nowrap; }}
-    .logo-img {{ width: 60px; height: auto; margin-right: 12px; border-radius: 10px; flex-shrink: 0; }}
-    .logo-text {{ color: {st.session_state.theme_color}; margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 1px; line-height: 1; white-space: nowrap; }}
+    .logo-container {{
+        display: flex;
+        align-items: center; 
+        justify-content: flex-start;
+        margin-bottom: 15px;
+        flex-wrap: nowrap;
+    }}
+    .logo-img {{
+        width: 60px; 
+        height: auto;
+        margin-right: 12px;
+        border-radius: 10px;
+        flex-shrink: 0;
+    }}
+    .logo-text {{
+        color: {st.session_state.theme_color};
+        margin: 0;
+        font-size: 26px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        line-height: 1;
+        white-space: nowrap;
+    }}
     
-    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700 !important; font-size: 13px; text-transform: uppercase; padding: 8px 0px; }}
-    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; font-size: 14px; font-weight: 900 !important; }}
+    div.stButton > button {{
+        width: 100%;
+        border-radius: 8px;
+        font-weight: 700 !important;
+        font-size: 13px;
+        text-transform: uppercase;
+        padding: 8px 0px; 
+    }}
+    
+    div.stButton > button[kind="primary"] {{
+        background-color: {st.session_state.theme_color};
+        color: black;
+        border: none;
+        font-size: 14px;
+        font-weight: 900 !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -77,28 +148,34 @@ except: pass
 @st.cache_resource
 def get_model():
     try:
-        return genai.GenerativeModel("gemini-pro")
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                if 'gemini' in m.name: return genai.GenerativeModel(m.name)
     except: pass
-    return None
+    return genai.GenerativeModel("gemini-pro")
 
-# --- VERİ MOTORU (GÜÇLENDİRİLDİ) ---
+# --- ZIRHLI VERİ MOTORU (API KORUMALI) ---
 
 @st.cache_data(ttl=3600) 
 def search_coin_id(query):
     try:
         url = f"https://api.coingecko.com/api/v3/search?query={query}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()
-        if r.get('coins'): return r['coins'][0]['id']
+        coins = r.get('coins', [])
+        if not coins: return None
+        for coin in coins:
+            if coin['symbol'].lower() == query.lower():
+                return coin['id']
+        return coins[0]['id']
     except: return None
-    return None
 
-# FİYAT SORGUSU: 2 DAKİKA ÖNBELLEK (Çok sık değişmez, limiti korur)
-@st.cache_data(ttl=120)
+# ÖNEMLİ: Fiyat verisi 180 saniye (3 dakika) önbellekte kalır. Sürekli istek atmaz.
+@st.cache_data(ttl=180)
 def get_coin_data(coin_id, currency):
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}&include_24hr_change=true"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-        if r.status_code != 200: return None # Hata varsa sessizce None dön
+        if r.status_code != 200: return None # Limit hatası varsa sessiz kal, çökme
         data = r.json()
         if coin_id in data: return data[coin_id]
     except: return None
@@ -111,7 +188,7 @@ def get_global_data():
         return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()['data']
     except: return None
 
-# TOP 10 LİSTESİ: 10 DAKİKA ÖNBELLEK (Sürekli değişmez)
+# TOP 10 LİSTESİ: 10 Dakika önbellek.
 @st.cache_data(ttl=600)
 def get_top10_coins(currency):
     try:
@@ -123,8 +200,8 @@ def get_top10_coins(currency):
         return []
     except: return []
 
-# GRAFİK VERİSİ: 20 DAKİKA ÖNBELLEK (Grafik her saniye değişmez, en büyük yük burada)
-@st.cache_data(ttl=1200)
+# GRAFİK VERİSİ: 30 DAKİKA ÖNBELLEK! (En çok bu yorar, bunu uzun tutuyoruz)
+@st.cache_data(ttl=1800)
 def get_chart_data(coin_id, currency, days):
     try:
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency={currency}&days={days}"
@@ -153,7 +230,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     if df.empty:
         fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                           xaxis=dict(visible=False), yaxis=dict(visible=False),
-                          annotations=[dict(text="Veri Yüklenemedi", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
+                          annotations=[dict(text="Veri Yok (Limit)", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
         return fig
 
     main_color = '#ea3943' if price_change < 0 else '#16c784'
@@ -204,7 +281,8 @@ with col_nav:
             analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
             
             st.markdown("---")
-            st.caption("🚀 **HIZLI ERİŞİM**")
+            
+            st.caption("🚀 **HIZLI ERİŞİM (TOP 10)**")
             top10_data = get_top10_coins(st.session_state.currency)
             
             if top10_data:
@@ -252,7 +330,7 @@ with col_main:
         curr = st.session_state.currency
         curr_sym = "$" if curr == 'usd' else "₺" if curr == 'try' else "€"
         
-        # VERİLERİ BAĞIMSIZ ÇEKİYORUZ (Biri patlarsa diğeri çalışsın)
+        # 1. KULLANICI COIN VERİSİ
         user_coin_id = raw_input
         user_data = get_coin_data(user_coin_id, curr)
         
@@ -262,13 +340,12 @@ with col_main:
                 user_coin_id = found_id
                 user_data = get_coin_data(user_coin_id, curr)
 
-        # Bitcoin verisini HER ZAMAN çekmeye çalış ama yoksa da dert etme
+        # 2. BITCOIN VERİSİ (BAĞIMSIZ)
         btc_data = get_coin_data(btc_id, curr)
         
-        # EKRAN DÜZENİ: ÖNCE KOLONLARI OLUŞTUR
         c_chart1, c_chart2 = st.columns(2)
         
-        # 1. KULLANICI COIN GRAFİĞİ
+        # --- GRAFİK 1: KULLANICI ---
         with c_chart1:
             if user_data:
                 u_change = user_data.get(f'{curr}_24h_change', 0)
@@ -279,9 +356,9 @@ with col_main:
                 u_df = get_chart_data(user_coin_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="user_chart")
             else:
-                st.warning(f"⚠️ {user_coin_id.upper()} verisi alınamadı (Limit/Hata).")
+                st.warning(f"⚠️ {user_coin_id.upper()} verisi (Limit).")
 
-        # 2. BITCOIN GRAFİĞİ (BAĞIMSIZ ÇALIŞIR)
+        # --- GRAFİK 2: BITCOIN (HATA OLSA BİLE BURASI BOŞ KALMAZ) ---
         with c_chart2:
             if btc_data:
                 b_change = btc_data.get(f'{curr}_24h_change', 0)
@@ -292,9 +369,8 @@ with col_main:
                 b_df = get_chart_data(btc_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(b_df, b_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="btc_chart")
             else:
-                st.info("Bitcoin verisi güncelleniyor...")
+                st.info("BTC verisi güncelleniyor...")
 
-        # ALT KISIM
         c_bot1, c_bot2, c_bot3 = st.columns(3)
         with c_bot1:
             with st.container(border=True):
@@ -306,8 +382,8 @@ with col_main:
                             with st.spinner(".."):
                                 try:
                                     m = get_model()
-                                    p_info = f"{user_data[curr]}" if user_data else "Bilinmiyor"
-                                    r = m.generate_content(f"Coin: {user_coin_id}. Fiyat: {p_info}. Soru: {user_q}. Kısa cevapla.")
+                                    p_txt = str(user_data[curr]) if user_data else "?"
+                                    r = m.generate_content(f"Coin: {user_coin_id}. Fiyat: {p_txt}. Soru: {user_q}. Kısa cevapla.")
                                     st.info(r.text)
                                 except: pass
 
