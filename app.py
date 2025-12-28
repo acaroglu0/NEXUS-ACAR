@@ -11,17 +11,17 @@ import base64
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
 
-# SESSION STATE (VARSAYILAN COIN ARTIK KESİN ETHEREUM)
+# SESSION STATE
 if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931A'
 if 'currency' not in st.session_state: st.session_state.currency = 'usd'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'app_mode' not in st.session_state: st.session_state.app_mode = 'TERMINAL'
-if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' # DÜZELTİLDİ
+if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' 
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS Portal v11.4 Yayında! Açılış artık Ethereum.", "time": "09:00"},
-        {"user": "Trader_01", "msg": "Tablo efsane olmuş, tam CMC gibi.", "time": "09:15"}
+        {"user": "Admin 🦁", "msg": "NEXUS v11.5 Yayında! API Koruması ve Akıllı Önbellek devrede.", "time": "10:00"},
+        {"user": "Trader_01", "msg": "Artık çok daha hızlı çalışıyor.", "time": "10:15"}
     ]
 
 THEMES = {
@@ -45,104 +45,26 @@ logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) els
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
+    .block-container {{ padding-top: 2rem; padding-bottom: 2rem; padding-left: 1rem; padding-right: 1rem; max-width: 100%; }}
+    .nexus-panel {{ background-color: #1E1E1E; padding: 10px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; }}
     
-    .block-container {{
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        max-width: 100%;
-    }}
-    
-    .nexus-panel {{
-        background-color: #1E1E1E;
-        padding: 10px;
-        border-radius: 12px;
-        border: 1px solid #333;
-        margin-bottom: 10px;
-    }}
-    
-    /* CMC TARZI GELİŞMİŞ TABLO */
-    .coin-header {{
-        display: flex;
-        justify-content: space-between;
-        color: gray;
-        font-size: 12px;
-        padding: 5px 10px;
-        margin-bottom: 5px;
-        font-weight: bold;
-    }}
-    
-    .coin-row {{
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        background-color: #151515;
-        border-bottom: 1px solid #333;
-        padding: 12px 10px;
-        transition: background 0.2s;
-        border-radius: 6px;
-        margin-bottom: 5px;
-    }}
-    .coin-row:hover {{
-        background-color: #252525;
-    }}
+    /* CMC TARZI TABLO */
+    .coin-header {{ display: flex; justify-content: space-between; color: gray; font-size: 12px; padding: 5px 10px; margin-bottom: 5px; font-weight: bold; }}
+    .coin-row {{ display: flex; align-items: center; justify-content: space-between; background-color: #151515; border-bottom: 1px solid #333; padding: 12px 10px; border-radius: 6px; margin-bottom: 5px; }}
+    .coin-row:hover {{ background-color: #252525; }}
     
     .row-left {{ display: flex; align-items: center; flex: 1.5; }}
-    .coin-rank {{ color: gray; font-size: 12px; margin-right: 10px; min-width: 20px; }}
-    .coin-name {{ font-weight: bold; color: white; margin-left: 10px; font-size: 15px; }}
-    
     .row-right {{ display: flex; align-items: center; flex: 2; justify-content: flex-end; }}
-    .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
+    .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     
-    @media only screen and (max-width: 600px) {{
-        .stat-col {{ font-size: 11px; width: 22%; }}
-        .price-col {{ font-size: 12px; width: 34%; }}
-        .coin-name {{ font-size: 13px; }}
-    }}
-
     /* LOGO */
-    .logo-container {{
-        display: flex;
-        align-items: center; 
-        justify-content: flex-start;
-        margin-bottom: 15px;
-        flex-wrap: nowrap;
-    }}
-    .logo-img {{
-        width: 60px; 
-        height: auto;
-        margin-right: 12px;
-        border-radius: 10px;
-        flex-shrink: 0;
-    }}
-    .logo-text {{
-        color: {st.session_state.theme_color};
-        margin: 0;
-        font-size: 26px;
-        font-weight: 900;
-        letter-spacing: 1px;
-        line-height: 1;
-        white-space: nowrap;
-    }}
+    .logo-container {{ display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; flex-wrap: nowrap; }}
+    .logo-img {{ width: 60px; height: auto; margin-right: 12px; border-radius: 10px; flex-shrink: 0; }}
+    .logo-text {{ color: {st.session_state.theme_color}; margin: 0; font-size: 26px; font-weight: 900; letter-spacing: 1px; line-height: 1; white-space: nowrap; }}
     
-    div.stButton > button {{
-        width: 100%;
-        border-radius: 8px;
-        font-weight: 700 !important;
-        font-size: 13px;
-        text-transform: uppercase;
-        padding: 8px 0px; 
-    }}
-    
-    div.stButton > button[kind="primary"] {{
-        background-color: {st.session_state.theme_color};
-        color: black;
-        border: none;
-        font-size: 14px;
-        font-weight: 900 !important;
-    }}
+    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700 !important; font-size: 13px; text-transform: uppercase; padding: 8px 0px; }}
+    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; font-size: 14px; font-weight: 900 !important; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -155,33 +77,28 @@ except: pass
 @st.cache_resource
 def get_model():
     try:
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                if 'gemini' in m.name: return genai.GenerativeModel(m.name)
+        return genai.GenerativeModel("gemini-pro")
     except: pass
-    return genai.GenerativeModel("gemini-pro")
+    return None
 
-# --- VERİ MOTORU ---
+# --- VERİ MOTORU (GÜÇLENDİRİLDİ) ---
 
 @st.cache_data(ttl=3600) 
 def search_coin_id(query):
     try:
         url = f"https://api.coingecko.com/api/v3/search?query={query}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()
-        coins = r.get('coins', [])
-        if not coins: return None
-        for coin in coins:
-            if coin['symbol'].lower() == query.lower():
-                return coin['id']
-        return coins[0]['id']
+        if r.get('coins'): return r['coins'][0]['id']
     except: return None
+    return None
 
-@st.cache_data(ttl=60)
+# FİYAT SORGUSU: 2 DAKİKA ÖNBELLEK (Çok sık değişmez, limiti korur)
+@st.cache_data(ttl=120)
 def get_coin_data(coin_id, currency):
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}&include_24hr_change=true"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-        if r.status_code != 200: return "LIMIT"
+        if r.status_code != 200: return None # Hata varsa sessizce None dön
         data = r.json()
         if coin_id in data: return data[coin_id]
     except: return None
@@ -194,7 +111,8 @@ def get_global_data():
         return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()['data']
     except: return None
 
-@st.cache_data(ttl=300)
+# TOP 10 LİSTESİ: 10 DAKİKA ÖNBELLEK (Sürekli değişmez)
+@st.cache_data(ttl=600)
 def get_top10_coins(currency):
     try:
         url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency={currency}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=1h,24h,7d"
@@ -205,7 +123,8 @@ def get_top10_coins(currency):
         return []
     except: return []
 
-@st.cache_data(ttl=300)
+# GRAFİK VERİSİ: 20 DAKİKA ÖNBELLEK (Grafik her saniye değişmez, en büyük yük burada)
+@st.cache_data(ttl=1200)
 def get_chart_data(coin_id, currency, days):
     try:
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency={currency}&days={days}"
@@ -234,7 +153,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     if df.empty:
         fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                           xaxis=dict(visible=False), yaxis=dict(visible=False),
-                          annotations=[dict(text="Veri Yok (API Limiti)", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
+                          annotations=[dict(text="Veri Yüklenemedi", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
         return fig
 
     main_color = '#ea3943' if price_change < 0 else '#16c784'
@@ -276,9 +195,7 @@ with col_nav:
         st.markdown("---")
         
         if st.session_state.app_mode == "TERMINAL":
-            # 1. ÖNCE MANUEL ARAMA VE BUTON
             st.caption("🔍 **KRİPTO SEÇ**")
-            # DEFAULT DEĞER ARTIK 'ethereum' (SESSION STATE'DEN GELİYOR)
             coin_input = st.text_input("Coin Ara:", st.session_state.selected_coin, label_visibility="collapsed")
             if coin_input != st.session_state.selected_coin:
                 st.session_state.selected_coin = coin_input
@@ -287,9 +204,7 @@ with col_nav:
             analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
             
             st.markdown("---")
-            
-            # 2. SONRA HIZLI ERİŞİM (ALTTA)
-            st.caption("🚀 **HIZLI ERİŞİM (TOP 10)**")
+            st.caption("🚀 **HIZLI ERİŞİM**")
             top10_data = get_top10_coins(st.session_state.currency)
             
             if top10_data:
@@ -299,7 +214,7 @@ with col_nav:
                         st.session_state.selected_coin = coin['id']
                         st.rerun()
             else:
-                st.caption("Liste yükleniyor...")
+                st.caption("Yükleniyor...")
 
             st.markdown("---")
             st.caption("⏳ **SÜRE**")
@@ -337,26 +252,25 @@ with col_main:
         curr = st.session_state.currency
         curr_sym = "$" if curr == 'usd' else "₺" if curr == 'try' else "€"
         
-        # KULLANICI COIN VERİSİ (Şimdi varsayılan olarak ETH gelecek)
+        # VERİLERİ BAĞIMSIZ ÇEKİYORUZ (Biri patlarsa diğeri çalışsın)
         user_coin_id = raw_input
         user_data = get_coin_data(user_coin_id, curr)
         
-        # Eğer "ethereum" bile bulunamazsa API'den ara
         if user_data is None:
             found_id = search_coin_id(raw_input)
             if found_id:
                 user_coin_id = found_id
                 user_data = get_coin_data(user_coin_id, curr)
 
+        # Bitcoin verisini HER ZAMAN çekmeye çalış ama yoksa da dert etme
         btc_data = get_coin_data(btc_id, curr)
         
-        if user_data == "LIMIT" or btc_data == "LIMIT":
-            st.warning("⚠️ **API Limiti:** Veri sağlayıcı yoğun. Lütfen 1 dakika bekleyin.")
+        # EKRAN DÜZENİ: ÖNCE KOLONLARI OLUŞTUR
+        c_chart1, c_chart2 = st.columns(2)
         
-        elif user_data and btc_data:
-            c_chart1, c_chart2 = st.columns(2)
-            
-            with c_chart1:
+        # 1. KULLANICI COIN GRAFİĞİ
+        with c_chart1:
+            if user_data:
                 u_change = user_data.get(f'{curr}_24h_change', 0)
                 u_color = "#ea3943" if u_change < 0 else "#16c784"
                 cl1, cl2 = st.columns([1, 1])
@@ -364,8 +278,12 @@ with col_main:
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
                 u_df = get_chart_data(user_coin_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="user_chart")
+            else:
+                st.warning(f"⚠️ {user_coin_id.upper()} verisi alınamadı (Limit/Hata).")
 
-            with c_chart2:
+        # 2. BITCOIN GRAFİĞİ (BAĞIMSIZ ÇALIŞIR)
+        with c_chart2:
+            if btc_data:
                 b_change = btc_data.get(f'{curr}_24h_change', 0)
                 b_color = "#ea3943" if b_change < 0 else "#16c784"
                 cr1, cr2 = st.columns([1, 1])
@@ -373,65 +291,67 @@ with col_main:
                 cr2.markdown(f"<h3 style='text-align:right; color:{b_color}; margin:0;'>{curr_sym}{btc_data[curr]:,.2f} (%{b_change:.2f})</h3>", unsafe_allow_html=True)
                 b_df = get_chart_data(btc_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(b_df, b_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="btc_chart")
+            else:
+                st.info("Bitcoin verisi güncelleniyor...")
 
-            c_bot1, c_bot2, c_bot3 = st.columns(3)
-            with c_bot1:
-                with st.container(border=True):
-                    st.caption(f"🤖 **NEXUS AI SOR**")
-                    user_q = st.text_input("Soru:", placeholder="Destek neresi?", label_visibility="collapsed")
-                    if st.button("GÖNDER", key="ai_ask"):
-                         if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
-                         else:
-                             with st.spinner(".."):
-                                 try:
-                                     m = get_model()
-                                     r = m.generate_content(f"Coin: {user_coin_id}. Fiyat: {user_data[curr]}. Soru: {user_q}. Kısa cevapla.")
-                                     st.info(r.text)
-                                 except: pass
+        # ALT KISIM
+        c_bot1, c_bot2, c_bot3 = st.columns(3)
+        with c_bot1:
+            with st.container(border=True):
+                st.caption(f"🤖 **NEXUS AI SOR**")
+                user_q = st.text_input("Soru:", placeholder="Destek neresi?", label_visibility="collapsed")
+                if st.button("GÖNDER", key="ai_ask"):
+                        if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
+                        else:
+                            with st.spinner(".."):
+                                try:
+                                    m = get_model()
+                                    p_info = f"{user_data[curr]}" if user_data else "Bilinmiyor"
+                                    r = m.generate_content(f"Coin: {user_coin_id}. Fiyat: {p_info}. Soru: {user_q}. Kısa cevapla.")
+                                    st.info(r.text)
+                                except: pass
 
-            with c_bot2:
-                with st.container(border=True):
-                    st.markdown("""<div class="box-content"><div class="ad-placeholder">REKLAM ALANI</div></div>""", unsafe_allow_html=True)
+        with c_bot2:
+            with st.container(border=True):
+                st.markdown("""<div class="box-content"><div class="ad-placeholder">REKLAM ALANI</div></div>""", unsafe_allow_html=True)
 
-            with c_bot3:
-                with st.container(border=True):
-                    global_data = get_global_data()
-                    if global_data:
-                        total_cap = global_data['total_market_cap'][curr]
-                        total_change = global_data['market_cap_change_percentage_24h_usd']
-                        arrow = "⬆" if total_change > 0 else "⬇"
-                        t_color = "#16c784" if total_change > 0 else "#ea3943"
-                        if total_cap > 1_000_000_000_000: t_fmt = f"{total_cap/1_000_000_000_000:.2f} T"
-                        else: t_fmt = f"{total_cap/1_000_000_000:.2f} B"
-                        st.markdown(f"""<div class="box-content"><h3 style="color: gray; margin: 0; font-size: 13px;">GLOBAL MARKET CAP</h3><h1 style="color: white; margin: 5px 0; font-size: 26px;">{curr_sym}{t_fmt}</h1><h3 style="color: {t_color}; margin: 0; font-size: 18px;">{arrow} %{total_change:.2f}</h3></div>""", unsafe_allow_html=True)
-                    else: st.caption("Veri güncelleniyor...")
-            
-            if analyze_btn:
-                 st.markdown("---")
-                 st.subheader(f"🧠 NEXUS: Detaylı Rapor")
-                 if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
-                 else:
-                     with st.spinner("Analiz ediliyor..."):
-                         try:
-                             model = get_model()
-                             price_now = user_data[curr]
-                             structured_prompt = f"""
-                             Sen uzman bir kripto analistisin. Coin: {user_coin_id.upper()}. Fiyat: {price_now} {curr.upper()}.
-                             Analizi şu 3 başlıkta yap (Dil: {st.session_state.language}):
-                             **1. GENEL BAKIŞ & HABERLER** (Proje ve piyasa algısı özeti)
-                             **2. RİSK ANALİZİ** (Risk durumu)
-                             **3. FİYAT TAHMİNİ (ÖNEMLİ)**
-                             * Teknik analiz özeti.
-                             * **KISA VADE (1-3 GÜN):** Tahminini tam olarak şu HTML formatında yaz (Emoji KULLANMA, sadece yazı):
-                               <span style='color:#16c784; font-size:24px; font-weight:bold;'>%X.XX YÜKSELİŞ</span> (Eğer artışsa)
-                               <span style='color:#ea3943; font-size:24px; font-weight:bold;'>%X.XX DÜŞÜŞ</span> (Eğer düşüşse)
-                             * **UZUN VADE:** Beklentini yaz.
-                             """
-                             res = model.generate_content(structured_prompt)
-                             st.markdown(res.text, unsafe_allow_html=True)
-                         except: st.error("Bağlantı hatası.")
-        else:
-            st.warning(f"⚠️ '{raw_input}' bulunamadı.")
+        with c_bot3:
+            with st.container(border=True):
+                global_data = get_global_data()
+                if global_data:
+                    total_cap = global_data['total_market_cap'][curr]
+                    total_change = global_data['market_cap_change_percentage_24h_usd']
+                    arrow = "⬆" if total_change > 0 else "⬇"
+                    t_color = "#16c784" if total_change > 0 else "#ea3943"
+                    if total_cap > 1_000_000_000_000: t_fmt = f"{total_cap/1_000_000_000_000:.2f} T"
+                    else: t_fmt = f"{total_cap/1_000_000_000:.2f} B"
+                    st.markdown(f"""<div class="box-content"><h3 style="color: gray; margin: 0; font-size: 13px;">GLOBAL MARKET CAP</h3><h1 style="color: white; margin: 5px 0; font-size: 26px;">{curr_sym}{t_fmt}</h1><h3 style="color: {t_color}; margin: 0; font-size: 18px;">{arrow} %{total_change:.2f}</h3></div>""", unsafe_allow_html=True)
+                else: st.caption("Veri güncelleniyor...")
+        
+        if analyze_btn and user_data:
+                st.markdown("---")
+                st.subheader(f"🧠 NEXUS: Detaylı Rapor")
+                if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
+                else:
+                    with st.spinner("Analiz ediliyor..."):
+                        try:
+                            model = get_model()
+                            price_now = user_data[curr]
+                            structured_prompt = f"""
+                            Sen uzman bir kripto analistisin. Coin: {user_coin_id.upper()}. Fiyat: {price_now} {curr.upper()}.
+                            Analizi şu 3 başlıkta yap (Dil: {st.session_state.language}):
+                            **1. GENEL BAKIŞ & HABERLER** (Proje ve piyasa algısı özeti)
+                            **2. RİSK ANALİZİ** (Risk durumu)
+                            **3. FİYAT TAHMİNİ (ÖNEMLİ)**
+                            * Teknik analiz özeti.
+                            * **KISA VADE (1-3 GÜN):** Tahminini tam olarak şu HTML formatında yaz (Emoji KULLANMA, sadece yazı):
+                            <span style='color:#16c784; font-size:24px; font-weight:bold;'>%X.XX YÜKSELİŞ</span> (Eğer artışsa)
+                            <span style='color:#ea3943; font-size:24px; font-weight:bold;'>%X.XX DÜŞÜŞ</span> (Eğer düşüşse)
+                            * **UZUN VADE:** Beklentini yaz.
+                            """
+                            res = model.generate_content(structured_prompt)
+                            st.markdown(res.text, unsafe_allow_html=True)
+                        except: st.error("Bağlantı hatası.")
 
     # --- MOD 2: PORTAL (CMC TARZI LİSTE) ---
     else:
