@@ -7,8 +7,6 @@ import time
 import os
 import datetime
 import base64
-import random
-import numpy as np
 
 # --- 1. AYARLAR ---
 st.set_page_config(layout="wide", page_title="NEXUS AI", page_icon="🦁", initial_sidebar_state="collapsed")
@@ -18,7 +16,12 @@ if 'theme_color' not in st.session_state: st.session_state.theme_color = '#F7931
 if 'currency' not in st.session_state: st.session_state.currency = 'usd'
 if 'language' not in st.session_state: st.session_state.language = 'TR'
 if 'app_mode' not in st.session_state: st.session_state.app_mode = 'TERMINAL'
-if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' 
+if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'ethereum' # Varsayılan ETH
+
+if 'posts' not in st.session_state: 
+    st.session_state.posts = [
+        {"user": "Admin 🦁", "msg": "NEXUS v11.6 (Zırhlı Sürüm) devrede. Stabilite %100.", "time": "10:00"},
+    ]
 
 THEMES = {
     "Bitcoin Turuncusu 🟠": "#F7931A",
@@ -28,39 +31,115 @@ THEMES = {
     "Alarm Kırmızısı 🔴": "#FF0033"
 }
 
-# --- LOGO ---
+# --- LOGO YÜKLEME ---
 def get_base64_of_bin_file(bin_file):
-    with open(bin_file, 'rb') as f: data = f.read()
+    with open(bin_file, 'rb') as f:
+        data = f.read()
     return base64.b64encode(data).decode()
+
 logo_path = "logo.jpeg"
 logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else None
 
-# --- CSS ---
+# --- 2. CSS ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
-    .block-container {{ padding-top: 2rem; padding-bottom: 2rem; max-width: 100%; }}
-    .nexus-panel {{ background-color: #1E1E1E; padding: 10px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; }}
     
-    /* TABLO */
-    .coin-header {{ display: flex; justify-content: space-between; color: gray; font-size: 12px; padding: 5px 10px; margin-bottom: 5px; font-weight: bold; }}
-    .coin-row {{ display: flex; align-items: center; justify-content: space-between; background-color: #151515; border-bottom: 1px solid #333; padding: 12px 10px; border-radius: 6px; margin-bottom: 5px; }}
-    .coin-row:hover {{ background-color: #252525; }}
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        max-width: 100%;
+    }}
+    
+    .nexus-panel {{
+        background-color: #1E1E1E;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        margin-bottom: 10px;
+    }}
+    
+    /* CMC TARZI TABLO */
+    .coin-header {{
+        display: flex;
+        justify-content: space-between;
+        color: gray;
+        font-size: 12px;
+        padding: 5px 10px;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }}
+    
+    .coin-row {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #151515;
+        border-bottom: 1px solid #333;
+        padding: 12px 10px;
+        transition: background 0.2s;
+        border-radius: 6px;
+        margin-bottom: 5px;
+    }}
+    .coin-row:hover {{
+        background-color: #252525;
+    }}
+    
     .row-left {{ display: flex; align-items: center; flex: 1.5; }}
+    .coin-rank {{ color: gray; font-size: 12px; margin-right: 10px; min-width: 20px; }}
+    .coin-name {{ font-weight: bold; color: white; margin-left: 10px; font-size: 15px; }}
+    
     .row-right {{ display: flex; align-items: center; flex: 2; justify-content: flex-end; }}
+    .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     
     /* LOGO */
-    .logo-container {{ display: flex; align-items: center; margin-bottom: 15px; }}
-    .logo-img {{ width: 60px; height: auto; margin-right: 12px; border-radius: 10px; }}
-    .logo-text {{ color: {st.session_state.theme_color}; margin: 0; font-size: 26px; font-weight: 900; }}
+    .logo-container {{
+        display: flex;
+        align-items: center; 
+        justify-content: flex-start;
+        margin-bottom: 15px;
+        flex-wrap: nowrap;
+    }}
+    .logo-img {{
+        width: 60px; 
+        height: auto;
+        margin-right: 12px;
+        border-radius: 10px;
+        flex-shrink: 0;
+    }}
+    .logo-text {{
+        color: {st.session_state.theme_color};
+        margin: 0;
+        font-size: 26px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        line-height: 1;
+        white-space: nowrap;
+    }}
     
-    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; text-transform: uppercase; }}
-    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; }}
+    div.stButton > button {{
+        width: 100%;
+        border-radius: 8px;
+        font-weight: 700 !important;
+        font-size: 13px;
+        text-transform: uppercase;
+        padding: 8px 0px; 
+    }}
+    
+    div.stButton > button[kind="primary"] {{
+        background-color: {st.session_state.theme_color};
+        color: black;
+        border: none;
+        font-size: 14px;
+        font-weight: 900 !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
-# --- API KEY ---
+# --- API ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     if api_key: genai.configure(api_key=api_key)
@@ -68,240 +147,376 @@ except: pass
 
 @st.cache_resource
 def get_model():
-    try: return genai.GenerativeModel("gemini-pro")
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                if 'gemini' in m.name: return genai.GenerativeModel(m.name)
+    except: pass
+    return genai.GenerativeModel("gemini-pro")
+
+# --- ZIRHLI VERİ MOTORU (API KORUMALI) ---
+
+@st.cache_data(ttl=3600) 
+def search_coin_id(query):
+    try:
+        url = f"https://api.coingecko.com/api/v3/search?query={query}"
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()
+        coins = r.get('coins', [])
+        if not coins: return None
+        for coin in coins:
+            if coin['symbol'].lower() == query.lower():
+                return coin['id']
+        return coins[0]['id']
     except: return None
 
-# --- YENİ ÇİFT MOTORLU VERİ SİSTEMİ ---
-
-# ID Eşleştirici (CoinGecko ID -> Binance Symbol)
-def get_symbol_map(coin_id):
-    mapping = {
-        "bitcoin": "BTCUSDT", "ethereum": "ETHUSDT", "solana": "SOLUSDT", 
-        "ripple": "XRPUSDT", "avalanche-2": "AVAXUSDT", "binancecoin": "BNBUSDT",
-        "dogecoin": "DOGEUSDT", "cardano": "ADAUSDT", "tron": "TRXUSDT",
-        "pepe": "PEPEUSDT", "shiba-inu": "SHIBUSDT"
-    }
-    return mapping.get(coin_id.lower(), None)
-
-# MOTOR 1: BINANCE (Çok Hızlı, Yüksek Limit)
-def fetch_binance_price(symbol):
+# ÖNEMLİ: Fiyat verisi 180 saniye (3 dakika) önbellekte kalır. Sürekli istek atmaz.
+@st.cache_data(ttl=180)
+def get_coin_data(coin_id, currency):
     try:
-        url = f"https://api.binance.com/api/v3/ticker/24hr?symbol={symbol}"
-        r = requests.get(url, timeout=2)
-        if r.status_code == 200:
-            d = r.json()
-            return {
-                "usd": float(d['lastPrice']),
-                "usd_24h_change": float(d['priceChangePercent']),
-                "source": "Binance"
-            }
-    except: pass
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies={currency}&include_24hr_change=true"
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        if r.status_code != 200: return None # Limit hatası varsa sessiz kal, çökme
+        data = r.json()
+        if coin_id in data: return data[coin_id]
+    except: return None
     return None
 
-def fetch_binance_chart(symbol, limit=24):
+@st.cache_data(ttl=86400) 
+def get_global_data():
     try:
-        # Kline/Candlestick verisi
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=1h&limit={limit}"
-        r = requests.get(url, timeout=2)
-        if r.status_code == 200:
-            data = r.json()
-            # Binance [OpenTime, Open, High, Low, Close, ...] döner. 0=Time, 4=ClosePrice
-            df = pd.DataFrame(data, columns=['time', 'open', 'high', 'low', 'close', 'vol', 'close_time', 'qav', 'num_trades', 'taker_base', 'taker_quote', 'ignore'])
-            df['time'] = pd.to_datetime(df['time'], unit='ms')
-            df['price'] = df['close'].astype(float)
-            return df[['time', 'price']]
-    except: pass
-    return pd.DataFrame()
+        url = "https://api.coingecko.com/api/v3/global"
+        return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()['data']
+    except: return None
 
-# MOTOR 2: COINGECKO (Yedek, Daha Geniş Kapsam)
-def fetch_coingecko_price(coin_id):
+# TOP 10 LİSTESİ: 10 Dakika önbellek.
+@st.cache_data(ttl=600)
+def get_top10_coins(currency):
     try:
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd&include_24hr_change=true"
-        r = requests.get(url, timeout=2)
-        if r.status_code == 200:
-            d = r.json().get(coin_id)
-            if d:
-                return {
-                    "usd": d['usd'],
-                    "usd_24h_change": d['usd_24h_change'],
-                    "source": "CoinGecko"
-                }
-    except: pass
-    return None
+        url = f"https://api.coingecko.com/api/v3/coins/markets?vs_currency={currency}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=1h,24h,7d"
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        if r.status_code != 200: return [] 
+        data = r.json()
+        if isinstance(data, list): return data
+        return []
+    except: return []
 
-def fetch_coingecko_chart(coin_id, days):
+# GRAFİK VERİSİ: 30 DAKİKA ÖNBELLEK! (En çok bu yorar, bunu uzun tutuyoruz)
+@st.cache_data(ttl=1800)
+def get_chart_data(coin_id, currency, days):
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency=usd&days={days}"
-        r = requests.get(url, timeout=2)
-        if r.status_code == 200:
-            d = r.json()
-            df = pd.DataFrame(d['prices'], columns=['time', 'price'])
-            df['time'] = pd.to_datetime(df['time'], unit='ms')
-            return df
-    except: pass
-    return pd.DataFrame()
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency={currency}&days={days}"
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        if r.status_code != 200: return pd.DataFrame()
+        data = r.json()
+        if 'prices' not in data: return pd.DataFrame()
+        df = pd.DataFrame(data['prices'], columns=['time', 'price'])
+        df['time'] = pd.to_datetime(df['time'], unit='ms')
+        return df
+    except: return pd.DataFrame()
 
-# MOTOR 3: SIMULATION (Son Çare, Asla Boş Ekran Gösterme)
-def generate_mock(coin_id):
-    base = 100
-    if "btc" in coin_id: base = 98000
-    elif "eth" in coin_id: base = 3100
-    return {
-        "usd": base + random.uniform(-10, 10),
-        "usd_24h_change": random.uniform(-5, 5),
-        "source": "Simülasyon"
-    }
+@st.cache_data(ttl=600)
+def get_news(topic):
+    try:
+        import xml.etree.ElementTree as ET
+        rss_url = f"https://news.google.com/rss/search?q={topic}&hl=tr&gl=TR&ceid=TR:tr"
+        r = requests.get(rss_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        root = ET.fromstring(r.content)
+        return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:10]]
+    except: return []
 
-def generate_mock_chart():
-    dates = pd.date_range(end=datetime.datetime.now(), periods=24, freq='H')
-    prices = np.linspace(100, 110, 24) + np.random.normal(0, 2, 24)
-    return pd.DataFrame({'time': dates, 'price': prices})
-
-# --- ANA VERİ YÖNETİCİSİ (AKILLI SEÇİM) ---
-@st.cache_data(ttl=60) # 1 dk cache
-def get_smart_data(coin_id):
-    # 1. Binance Dene
-    symbol = get_symbol_map(coin_id)
-    if symbol:
-        data = fetch_binance_price(symbol)
-        if data: return data
-    
-    # 2. CoinGecko Dene
-    data = fetch_coingecko_price(coin_id)
-    if data: return data
-    
-    # 3. Simülasyon
-    return generate_mock(coin_id)
-
-@st.cache_data(ttl=300) # 5 dk cache
-def get_smart_chart(coin_id, days):
-    # 1. Binance Dene
-    symbol = get_symbol_map(coin_id)
-    if symbol:
-        df = fetch_binance_chart(symbol, limit=24 if days=='1' else 168)
-        if not df.empty: return df
-        
-    # 2. CoinGecko Dene
-    df = fetch_coingecko_chart(coin_id, days)
-    if not df.empty: return df
-    
-    # 3. Simülasyon
-    return generate_mock_chart()
-
-# --- GRAFİK ÇİZİCİ ---
-def create_chart(df, change, symbol):
-    if df.empty: return go.Figure()
-    
+# --- GRAFİK ---
+def create_mini_chart(df, price_change, currency_symbol, height=350):
     fig = go.Figure()
-    color = '#16c784' if change >= 0 else '#ea3943'
-    fill = 'rgba(22, 199, 132, 0.2)' if change >= 0 else 'rgba(234, 57, 67, 0.2)'
+    if df.empty:
+        fig.update_layout(height=height, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                          xaxis=dict(visible=False), yaxis=dict(visible=False),
+                          annotations=[dict(text="Veri Yok (Limit)", xref="paper", yref="paper", showarrow=False, font=dict(color="gray"))])
+        return fig
+
+    main_color = '#ea3943' if price_change < 0 else '#16c784'
+    fill_color = 'rgba(234, 57, 67, 0.2)' if price_change < 0 else 'rgba(22, 199, 132, 0.2)' 
+
+    min_p = df['price'].min()
+    max_p = df['price'].max()
+    padding = (max_p - min_p) * 0.05
     
-    fig.add_trace(go.Scatter(x=df['time'], y=df['price'], mode='lines', line=dict(color=color, width=2), fill='tozeroy', fillcolor=fill))
+    fig.add_trace(go.Scatter(
+        x=df['time'], y=df['price'], mode='lines', 
+        line=dict(color=main_color, width=2), 
+        fill='tozeroy', fillcolor=fill_color, showlegend=False
+    ))
     fig.update_layout(
-        height=350, margin=dict(l=0, r=0, t=10, b=0),
+        height=height, margin=dict(l=0, r=0, t=10, b=0),
         paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-        hovermode='x unified', xaxis=dict(visible=False), 
-        yaxis=dict(side='right', visible=True, gridcolor='rgba(128,128,128,0.1)', tickprefix=symbol)
+        hovermode='x unified', dragmode='pan',
+        xaxis=dict(showgrid=False, visible=False),
+        yaxis=dict(side='right', visible=True, showgrid=True, gridcolor='rgba(128,128,128,0.1)', color='white', range=[min_p-padding, max_p+padding], tickprefix=currency_symbol)
     )
     return fig
 
-# --- DÜZEN ---
-col_nav, col_main = st.columns([1, 4])
+# --- LAYOUT ---
+layout_cols = [1, 4, 1] if st.session_state.app_mode == "TERMINAL" else [1, 5]
+cols = st.columns(layout_cols)
+col_nav = cols[0]
+col_main = cols[1]
+col_right = cols[2] if len(cols) > 2 else None
 
+# --- SOL PANEL ---
 with col_nav:
     with st.container(border=True):
         if logo_base64:
             st.markdown(f"""<div class="logo-container"><img src="data:image/jpeg;base64,{logo_base64}" class="logo-img"><h1 class="logo-text">NEXUS</h1></div>""", unsafe_allow_html=True)
         else:
             st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.caption("KRİPTO SEÇ")
-        # Text input state yönetimi
-        def update_coin():
-            st.session_state.selected_coin = st.session_state.coin_input_val
             
-        st.text_input("Coin Ara:", value=st.session_state.selected_coin, key="coin_input_val", on_change=update_coin, label_visibility="collapsed")
+        st.markdown("---")
         
+        if st.session_state.app_mode == "TERMINAL":
+            st.caption("🔍 **KRİPTO SEÇ**")
+            coin_input = st.text_input("Coin Ara:", st.session_state.selected_coin, label_visibility="collapsed")
+            if coin_input != st.session_state.selected_coin:
+                st.session_state.selected_coin = coin_input
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
+            
+            st.markdown("---")
+            
+            st.caption("🚀 **HIZLI ERİŞİM (TOP 10)**")
+            top10_data = get_top10_coins(st.session_state.currency)
+            
+            if top10_data:
+                cols_quick = st.columns(3)
+                for i, coin in enumerate(top10_data[:10]):
+                    if cols_quick[i % 3].button(coin['symbol'].upper(), key=f"qbtn_{coin['id']}"):
+                        st.session_state.selected_coin = coin['id']
+                        st.rerun()
+            else:
+                st.caption("Yükleniyor...")
+
+            st.markdown("---")
+            st.caption("⏳ **SÜRE**")
+            day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
+            days_api = "1" if day_opt == "24 Saat" else "7"
+
         st.markdown("<br>", unsafe_allow_html=True)
-        analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary", use_container_width=True)
+        st.caption("🌐 **MOD**")
+        mode_select = st.radio("Mod:", ["TERMINAL", "PORTAL"], horizontal=True, label_visibility="collapsed")
+        if mode_select != st.session_state.app_mode:
+            st.session_state.app_mode = mode_select
+            st.rerun()
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.caption("🌍 **DİL**")
+        lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
+        st.session_state.language = lng
         
-        st.markdown("---")
-        st.caption("HIZLI ERİŞİM")
-        c1, c2 = st.columns(2)
-        if c1.button("BTC"): st.session_state.selected_coin = "bitcoin"
-        if c2.button("ETH"): st.session_state.selected_coin = "ethereum"
-        if c1.button("SOL"): st.session_state.selected_coin = "solana"
-        if c2.button("XRP"): st.session_state.selected_coin = "ripple"
+        if st.session_state.app_mode == "PORTAL":
+            st.markdown("---")
+            st.caption("⚙️ **AYARLAR**")
+            curr_opt = st.selectbox("Para Birimi", ["USD", "TRY", "EUR"], label_visibility="collapsed")
+            st.session_state.currency = curr_opt.lower()
+            thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
+            st.session_state.theme_color = THEMES[thm]
 
+
+# --- ANA İÇERİK ---
 with col_main:
-    curr_sym = "$" # Varsayılan
     
-    # 1. Coin Verisi
-    user_coin = st.session_state.selected_coin.lower().strip()
-    # Basit id mapping düzeltmesi
-    if user_coin == "btc": user_coin = "bitcoin"
-    if user_coin == "eth": user_coin = "ethereum"
-    
-    u_data = get_smart_data(user_coin)
-    b_data = get_smart_data("bitcoin")
-    
-    # --- ÜST GRAFİKLER ---
-    c_g1, c_g2 = st.columns(2)
-    
-    with c_g1:
-        if u_data:
-            chg = u_data['usd_24h_change']
-            clr = "#16c784" if chg >= 0 else "#ea3943"
-            st.markdown(f"<h2 style='margin:0'>{user_coin.upper()}</h2>", unsafe_allow_html=True)
-            st.markdown(f"<h3 style='color:{clr}; margin:0'>{curr_sym}{u_data['usd']:,.2f} (%{chg:.2f})</h3>", unsafe_allow_html=True)
-            st.caption(f"Veri Kaynağı: {u_data['source']}")
-            
-            df = get_smart_chart(user_coin, '1')
-            st.plotly_chart(create_chart(df, chg, curr_sym), use_container_width=True, config={'displayModeBar':False}, key="chart_u")
-        else:
-            st.error("Veri alınamadı.")
+    # --- MOD 1: TERMINAL ---
+    if st.session_state.app_mode == "TERMINAL":
+        raw_input = st.session_state.selected_coin.lower().strip()
+        btc_id = "bitcoin"
+        curr = st.session_state.currency
+        curr_sym = "$" if curr == 'usd' else "₺" if curr == 'try' else "€"
+        
+        # 1. KULLANICI COIN VERİSİ
+        user_coin_id = raw_input
+        user_data = get_coin_data(user_coin_id, curr)
+        
+        if user_data is None:
+            found_id = search_coin_id(raw_input)
+            if found_id:
+                user_coin_id = found_id
+                user_data = get_coin_data(user_coin_id, curr)
 
-    with c_g2:
-        if b_data:
-            chg = b_data['usd_24h_change']
-            clr = "#16c784" if chg >= 0 else "#ea3943"
-            st.markdown(f"<h2 style='margin:0'>BITCOIN</h2>", unsafe_allow_html=True)
-            st.markdown(f"<h3 style='color:{clr}; margin:0'>{curr_sym}{b_data['usd']:,.2f} (%{chg:.2f})</h3>", unsafe_allow_html=True)
-            
-            df = get_smart_chart("bitcoin", '1')
-            st.plotly_chart(create_chart(df, chg, curr_sym), use_container_width=True, config={'displayModeBar':False}, key="chart_b")
+        # 2. BITCOIN VERİSİ (BAĞIMSIZ)
+        btc_data = get_coin_data(btc_id, curr)
+        
+        c_chart1, c_chart2 = st.columns(2)
+        
+        # --- GRAFİK 1: KULLANICI ---
+        with c_chart1:
+            if user_data:
+                u_change = user_data.get(f'{curr}_24h_change', 0)
+                u_color = "#ea3943" if u_change < 0 else "#16c784"
+                cl1, cl2 = st.columns([1, 1])
+                cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
+                cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
+                u_df = get_chart_data(user_coin_id, curr, days_api)
+                st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="user_chart")
+            else:
+                st.warning(f"⚠️ {user_coin_id.upper()} verisi (Limit).")
 
-    # --- ALT KISIM ---
-    c_ask, c_news = st.columns([1, 1])
-    
-    with c_ask:
-        with st.container(border=True):
-            st.caption("🤖 **YAPAY ZEKA ASİSTANI**")
-            q = st.text_input("Soru:", placeholder="Analiz ne diyor?", label_visibility="collapsed")
-            if st.button("GÖNDER"):
+        # --- GRAFİK 2: BITCOIN (HATA OLSA BİLE BURASI BOŞ KALMAZ) ---
+        with c_chart2:
+            if btc_data:
+                b_change = btc_data.get(f'{curr}_24h_change', 0)
+                b_color = "#ea3943" if b_change < 0 else "#16c784"
+                cr1, cr2 = st.columns([1, 1])
+                cr1.markdown(f"<h2 style='margin:0;'>BITCOIN</h2>", unsafe_allow_html=True)
+                cr2.markdown(f"<h3 style='text-align:right; color:{b_color}; margin:0;'>{curr_sym}{btc_data[curr]:,.2f} (%{b_change:.2f})</h3>", unsafe_allow_html=True)
+                b_df = get_chart_data(btc_id, curr, days_api)
+                st.plotly_chart(create_mini_chart(b_df, b_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="btc_chart")
+            else:
+                st.info("BTC verisi güncelleniyor...")
+
+        c_bot1, c_bot2, c_bot3 = st.columns(3)
+        with c_bot1:
+            with st.container(border=True):
+                st.caption(f"🤖 **NEXUS AI SOR**")
+                user_q = st.text_input("Soru:", placeholder="Destek neresi?", label_visibility="collapsed")
+                if st.button("GÖNDER", key="ai_ask"):
+                        if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
+                        else:
+                            with st.spinner(".."):
+                                try:
+                                    m = get_model()
+                                    p_txt = str(user_data[curr]) if user_data else "?"
+                                    r = m.generate_content(f"Coin: {user_coin_id}. Fiyat: {p_txt}. Soru: {user_q}. Kısa cevapla.")
+                                    st.info(r.text)
+                                except: pass
+
+        with c_bot2:
+            with st.container(border=True):
+                st.markdown("""<div class="box-content"><div class="ad-placeholder">REKLAM ALANI</div></div>""", unsafe_allow_html=True)
+
+        with c_bot3:
+            with st.container(border=True):
+                global_data = get_global_data()
+                if global_data:
+                    total_cap = global_data['total_market_cap'][curr]
+                    total_change = global_data['market_cap_change_percentage_24h_usd']
+                    arrow = "⬆" if total_change > 0 else "⬇"
+                    t_color = "#16c784" if total_change > 0 else "#ea3943"
+                    if total_cap > 1_000_000_000_000: t_fmt = f"{total_cap/1_000_000_000_000:.2f} T"
+                    else: t_fmt = f"{total_cap/1_000_000_000:.2f} B"
+                    st.markdown(f"""<div class="box-content"><h3 style="color: gray; margin: 0; font-size: 13px;">GLOBAL MARKET CAP</h3><h1 style="color: white; margin: 5px 0; font-size: 26px;">{curr_sym}{t_fmt}</h1><h3 style="color: {t_color}; margin: 0; font-size: 18px;">{arrow} %{total_change:.2f}</h3></div>""", unsafe_allow_html=True)
+                else: st.caption("Veri güncelleniyor...")
+        
+        if analyze_btn and user_data:
+                st.markdown("---")
+                st.subheader(f"🧠 NEXUS: Detaylı Rapor")
                 if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
                 else:
-                    with st.spinner("Düşünülüyor..."):
+                    with st.spinner("Analiz ediliyor..."):
                         try:
-                            m = get_model()
-                            res = m.generate_content(f"Coin: {user_coin}. Fiyat: {u_data['usd']}. Soru: {q}. Kısa cevap.")
-                            st.info(res.text)
-                        except: pass
-    
-    with c_news:
-        if analyze_btn and u_data:
-             with st.container(border=True):
-                 st.caption("📊 **ANALİZ RAPORU**")
-                 if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
-                 else:
-                     with st.spinner("Analiz yazılıyor..."):
-                         try:
-                             m = get_model()
-                             prompt = f"""
-                             Coin: {user_coin.upper()}. Fiyat: {u_data['usd']}. Değişim: %{u_data['usd_24h_change']}.
-                             Kısa, net bir yatırımcı analizi yap. Yükseliş mi düşüş mü bekleniyor?
-                             """
-                             res = m.generate_content(prompt)
-                             st.markdown(res.text)
-                         except: pass
+                            model = get_model()
+                            price_now = user_data[curr]
+                            structured_prompt = f"""
+                            Sen uzman bir kripto analistisin. Coin: {user_coin_id.upper()}. Fiyat: {price_now} {curr.upper()}.
+                            Analizi şu 3 başlıkta yap (Dil: {st.session_state.language}):
+                            **1. GENEL BAKIŞ & HABERLER** (Proje ve piyasa algısı özeti)
+                            **2. RİSK ANALİZİ** (Risk durumu)
+                            **3. FİYAT TAHMİNİ (ÖNEMLİ)**
+                            * Teknik analiz özeti.
+                            * **KISA VADE (1-3 GÜN):** Tahminini tam olarak şu HTML formatında yaz (Emoji KULLANMA, sadece yazı):
+                            <span style='color:#16c784; font-size:24px; font-weight:bold;'>%X.XX YÜKSELİŞ</span> (Eğer artışsa)
+                            <span style='color:#ea3943; font-size:24px; font-weight:bold;'>%X.XX DÜŞÜŞ</span> (Eğer düşüşse)
+                            * **UZUN VADE:** Beklentini yaz.
+                            """
+                            res = model.generate_content(structured_prompt)
+                            st.markdown(res.text, unsafe_allow_html=True)
+                        except: st.error("Bağlantı hatası.")
+
+    # --- MOD 2: PORTAL (CMC TARZI LİSTE) ---
+    else:
+        st.markdown(f"<h3 style='color:{st.session_state.theme_color}'>🏆 TOP 10 PIYASA</h3>", unsafe_allow_html=True)
+        top10 = get_top10_coins(st.session_state.currency)
+        curr_sym = "$" if st.session_state.currency == 'usd' else "₺"
+        
+        if top10:
+            st.markdown(f"""
+            <div class="coin-header">
+                <div style="flex:1.5;">COIN</div>
+                <div style="flex:2; display:flex; justify-content:flex-end;">
+                    <div style="width:30%; text-align:right;">FIYAT</div>
+                    <div style="width:20%; text-align:right;">1s</div>
+                    <div style="width:20%; text-align:right;">24s</div>
+                    <div style="width:20%; text-align:right;">7g</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            for idx, coin in enumerate(top10[:10]): 
+                p = coin['current_price']
+                price_fmt = f"{curr_sym}{p:,.2f}" if p > 1 else f"{curr_sym}{p:.6f}"
+                
+                p1 = coin.get('price_change_percentage_1h_in_currency') or 0
+                p24 = coin.get('price_change_percentage_24h_in_currency') or 0
+                p7 = coin.get('price_change_percentage_7d_in_currency') or 0
+                
+                c1 = "#16c784" if p1 > 0 else "#ea3943"
+                c24 = "#16c784" if p24 > 0 else "#ea3943"
+                c7 = "#16c784" if p7 > 0 else "#ea3943"
+
+                st.markdown(f"""
+                <div class="coin-row">
+                    <div class="row-left">
+                        <span class="coin-rank">{idx+1}</span>
+                        <img src="{coin['image']}" width="24" height="24">
+                        <span class="coin-name">{coin['symbol'].upper()}</span>
+                    </div>
+                    <div class="row-right">
+                        <div class="price-col">{price_fmt}</div>
+                        <div class="stat-col" style="color:{c1};">%{p1:.1f}</div>
+                        <div class="stat-col" style="color:{c24};">%{p24:.1f}</div>
+                        <div class="stat-col" style="color:{c7};">%{p7:.1f}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("⚠️ Top 10 verisi yükleniyor...")
+
+        st.markdown("---")
+        c_news, c_social = st.columns([1, 1])
+        
+        with c_news:
+            st.subheader("📰 GÜNDEM")
+            news_items = get_news("crypto market")
+            with st.container(height=500):
+                if news_items:
+                    for n in news_items:
+                        st.markdown(f"""<div class="news-card"><a href="{n['link']}" target="_blank" style="text-decoration: none; color: white; font-weight: bold;">{n['title']}</a></div>""", unsafe_allow_html=True)
+                else: st.info("Haberler yükleniyor...")
+
+        with c_social:
+            st.subheader("💬 TOPLULUK")
+            with st.container(border=True):
+                user_msg = st.text_input("Yorum Yaz:", placeholder="Düşüncelerin...")
+                if st.button("PAYLAŞ", use_container_width=True):
+                    if user_msg:
+                        st.session_state.posts.insert(0, {"user": "Misafir", "msg": user_msg, "time": datetime.datetime.now().strftime("%H:%M")})
+                        st.rerun()
+
+            with st.container(height=380):
+                for p in st.session_state.posts:
+                    st.markdown(f"""<div class="social-card"><span style="color:{st.session_state.theme_color}; font-weight:bold;">@{p['user']}</span> <span style="color:gray; font-size:10px;">{p['time']}</span><br>{p['msg']}</div>""", unsafe_allow_html=True)
+
+# --- SAĞ PANEL (SADECE TERMINAL) ---
+if col_right:
+    with col_right:
+        with st.container(border=True):
+            st.markdown("#### ⚙️ Ayarlar")
+            curr_opt = st.selectbox("Para Birimi", ["USD", "TRY", "EUR"], label_visibility="collapsed")
+            st.session_state.currency = curr_opt.lower()
+            st.markdown("<br>", unsafe_allow_html=True)
+            thm = st.selectbox("Tema", list(THEMES.keys()), label_visibility="collapsed")
+            st.session_state.theme_color = THEMES[thm]
+            st.markdown("---")
+            target = user_coin_id if 'user_coin_id' in locals() else 'bitcoin'
+            st.markdown(f"#### 📰 Haberler")
+            news = get_news(target)
+            if news:
+                for n in news:
+                    st.markdown(f"<div style='background-color: #262730; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 12px;'><a href='{n['link']}' style='color: white; text-decoration: none;'>{n['title']}</a></div>", unsafe_allow_html=True)
