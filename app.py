@@ -21,7 +21,7 @@ if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'et
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS v16.0: Analitik Çekirdek Aktif. Tahminler artık matematiksel.", "time": "Now"},
+        {"user": "Admin 🦁", "msg": "NEXUS v17.0: Logo düzeltildi, 1 Ay/6 Ay grafik ve Almanca eklendi.", "time": "Now"},
     ]
 
 THEMES = {
@@ -41,61 +41,122 @@ def get_base64_of_bin_file(bin_file):
 logo_path = "logo.jpeg"
 logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else None
 
-# --- TEKNİK ANALİZ MOTORU (YENİ) ---
+# --- TEKNİK ANALİZ MOTORU (RSI & SMA) ---
 def calculate_indicators(df):
     if df.empty or len(df) < 14:
         return None
     
-    # 1. RSI Hesaplama (14 Periyot)
     delta = df['price'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     df['rsi'] = 100 - (100 / (1 + rs))
-    
-    # 2. SMA (Hareketli Ortalama - 20 Periyot)
     df['sma'] = df['price'].rolling(window=20).mean()
     
-    # Son değerleri al
     last_rsi = df['rsi'].iloc[-1]
     last_sma = df['sma'].iloc[-1]
     last_price = df['price'].iloc[-1]
     
-    # Sinyalleri Oluştur
     trend = "YÜKSELİŞ (BOĞA)" if last_price > last_sma else "DÜŞÜŞ (AYI)"
-    
     rsi_status = "NÖTR"
-    if last_rsi > 70: rsi_status = "AŞIRI ALIM (Düzeltme Gelebilir)"
-    elif last_rsi < 30: rsi_status = "AŞIRI SATIM (Tepki Gelebilir)"
+    if last_rsi > 70: rsi_status = "AŞIRI ALIM (Riskli)"
+    elif last_rsi < 30: rsi_status = "AŞIRI SATIM (Fırsat)"
     
-    return {
-        "rsi": last_rsi,
-        "rsi_msg": rsi_status,
-        "trend": trend,
-        "sma_diff": ((last_price - last_sma) / last_sma) * 100 # Ortalamadan ne kadar uzak?
-    }
+    return {"rsi": last_rsi, "rsi_msg": rsi_status, "trend": trend, "sma_diff": ((last_price - last_sma) / last_sma) * 100}
 
 # --- 2. CSS ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
-    .block-container {{ padding-top: 2rem; padding-bottom: 2rem; max-width: 100%; }}
-    .nexus-panel {{ background-color: #1E1E1E; padding: 10px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; }}
     
-    .coin-header {{ display: flex; justify-content: space-between; color: gray; font-size: 12px; padding: 5px 10px; font-weight: bold; }}
-    .coin-row {{ display: flex; align-items: center; justify-content: space-between; background-color: #151515; border-bottom: 1px solid #333; padding: 12px 10px; border-radius: 6px; margin-bottom: 5px; }}
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        max-width: 100%;
+    }}
+    
+    .nexus-panel {{
+        background-color: #1E1E1E;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        margin-bottom: 10px;
+    }}
+    
+    /* CMC TARZI TABLO */
+    .coin-header {{
+        display: flex;
+        justify-content: space-between;
+        color: gray;
+        font-size: 12px;
+        padding: 5px 10px;
+        font-weight: bold;
+    }}
+    
+    .coin-row {{
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #151515;
+        border-bottom: 1px solid #333;
+        padding: 12px 10px;
+        transition: background 0.2s;
+        border-radius: 6px;
+        margin-bottom: 5px;
+    }}
     .coin-row:hover {{ background-color: #252525; }}
+    
     .row-left {{ display: flex; align-items: center; flex: 1.5; }}
+    .coin-rank {{ color: gray; font-size: 12px; margin-right: 10px; min-width: 20px; }}
+    .coin-name {{ font-weight: bold; color: white; margin-left: 10px; font-size: 15px; }}
     .row-right {{ display: flex; align-items: center; flex: 2; justify-content: flex-end; }}
     .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     
-    .logo-container {{ display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; }}
-    .logo-img {{ width: 60px; height: auto; margin-right: 12px; border-radius: 10px; }}
-    .logo-text {{ color: {st.session_state.theme_color}; margin: 0; font-size: 26px; font-weight: 900; }}
+    /* LOGO DÜZELTMESİ (Kesin Çözüm) */
+    .logo-container {{
+        display: flex;
+        align-items: center; 
+        justify-content: flex-start;
+        margin-bottom: 15px;
+        flex-wrap: nowrap !important; /* Asla alt satıra geçme */
+        overflow: hidden; /* Taşarsa gizle ama bozma */
+    }}
+    .logo-img {{
+        width: 60px; 
+        height: auto;
+        margin-right: 12px;
+        border-radius: 10px;
+        flex-shrink: 0; /* Resim sıkışmasın */
+    }}
+    .logo-text {{
+        color: {st.session_state.theme_color};
+        margin: 0;
+        font-size: 26px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        line-height: 1;
+        white-space: nowrap !important; /* Yazı asla bölünmesin */
+    }}
     
-    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; text-transform: uppercase; }}
-    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; font-size: 14px; font-weight: 900 !important; }}
+    div.stButton > button {{
+        width: 100%;
+        border-radius: 8px;
+        font-weight: 700 !important;
+        font-size: 13px;
+        text-transform: uppercase;
+        padding: 8px 0px; 
+    }}
+    
+    div.stButton > button[kind="primary"] {{
+        background-color: {st.session_state.theme_color};
+        color: black;
+        border: none;
+        font-size: 14px;
+        font-weight: 900 !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -108,7 +169,6 @@ except: pass
 @st.cache_resource
 def get_model():
     try:
-        # Temperature 0.2 yaparak yaratıcılığı (sallamayı) kısıtlıyoruz
         return genai.GenerativeModel("gemini-pro", generation_config={"temperature": 0.2})
     except: pass
     return None
@@ -119,9 +179,13 @@ def search_coin_id(query):
     try:
         url = f"https://api.coingecko.com/api/v3/search?query={query}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5).json()
-        if r.get('coins'): return r['coins'][0]['id']
+        coins = r.get('coins', [])
+        if not coins: return None
+        for coin in coins:
+            if coin['symbol'].lower() == query.lower():
+                return coin['id']
+        return coins[0]['id']
     except: return None
-    return None
 
 @st.cache_data(ttl=180)
 def get_coin_data(coin_id, currency):
@@ -228,8 +292,14 @@ with col_nav:
 
             st.markdown("---")
             st.caption("⏳ **SÜRE**")
-            day_opt = st.radio("Süre:", ["24 Saat", "7 Gün"], horizontal=True, label_visibility="collapsed")
-            days_api = "1" if day_opt == "24 Saat" else "7"
+            # 1 Ay ve 6 Ay eklendi
+            day_opt = st.radio("Süre:", ["24 Saat", "7 Gün", "1 Ay", "6 Ay"], horizontal=True, label_visibility="collapsed")
+            
+            # API için gün dönüşümü
+            if day_opt == "24 Saat": days_api = "1"
+            elif day_opt == "7 Gün": days_api = "7"
+            elif day_opt == "1 Ay": days_api = "30"
+            else: days_api = "180"
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.caption("🌐 **MOD**")
@@ -240,7 +310,8 @@ with col_nav:
             
         st.markdown("<br>", unsafe_allow_html=True)
         st.caption("🌍 **DİL**")
-        lng = st.radio("Dil:", ["TR", "EN"], horizontal=True, label_visibility="collapsed")
+        # Almanca (DE) eklendi
+        lng = st.radio("Dil:", ["TR", "EN", "DE"], horizontal=True, label_visibility="collapsed")
         st.session_state.language = lng
         
         if st.session_state.app_mode == "PORTAL":
@@ -280,9 +351,9 @@ with col_main:
                 cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
                 
-                # Grafik verisini al ve TEKNİK ANALİZİ HESAPLA
+                # Grafik verisini al
                 u_df = get_chart_data(user_coin_id, curr, days_api)
-                technical_data = calculate_indicators(u_df) # MATEMATİKSEL ANALİZ BURADA
+                technical_data = calculate_indicators(u_df) 
                 
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
 
@@ -328,29 +399,25 @@ with col_main:
             
             if analyze_btn:
                  st.markdown("---")
-                 st.subheader(f"🧠 NEXUS: Teknik Rapor")
+                 st.subheader(f"🧠 NEXUS: Analitik Rapor")
                  if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
-                 elif technical_data is None: st.warning("Yeterli teknik veri yok.")
+                 elif technical_data is None: st.warning("Teknik veri hesaplanıyor...")
                  else:
-                     with st.spinner("Matematiksel Analiz Yapılıyor..."):
+                     with st.spinner("Matematiksel Veriler İşleniyor..."):
                          try:
                              model = get_model()
                              price_now = user_data[curr]
-                             
-                             # ARTIK AI'A "TAHMİN ET" DEMİYORUZ, HESAPLANAN VERİYİ YORUMLATIYORUZ
                              structured_prompt = f"""
-                             Sen profesyonel bir kripto analistisin. Sadece gerçek verileri yorumla. Sallama.
+                             Sen profesyonel bir kripto analistisin. Duygusal değil, sadece aşağıdaki MATEMATİKSEL verilere göre konuş.
+                             DİL: {st.session_state.language}
                              
-                             **COIN VERİLERİ (KESİN):**
+                             **VERİLER:**
                              * Coin: {user_coin_id.upper()}
                              * Fiyat: {price_now} {curr.upper()}
-                             * **RSI Değeri (14):** {technical_data['rsi']:.2f} -> Durum: **{technical_data['rsi_msg']}**
-                             * **Trend (SMA 20):** Fiyat ortalamanın %{technical_data['sma_diff']:.2f} kadar üzerinde/altında. Yön: **{technical_data['trend']}**
+                             * RSI (14): {technical_data['rsi']:.2f} ({technical_data['rsi_msg']})
+                             * Trend (SMA 20): {technical_data['trend']} (Ortalamadan %{technical_data['sma_diff']:.2f} fark)
                              
-                             **GÖREV:**
-                             Bu matematiksel verilere dayanarak kısa vadeli (24 saat) bir analiz yaz.
-                             Eğer RSI 70 üzerindeyse risk uyarısı ver. 30 altındaysa fırsat olabilir de.
-                             Trend yönüne sadık kal.
+                             Bu verilere dayanarak kısa vadeli net bir analiz yap.
                              """
                              res = model.generate_content(structured_prompt)
                              st.markdown(res.text, unsafe_allow_html=True)
