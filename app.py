@@ -21,7 +21,7 @@ if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'et
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS v20.0: Stabil Sürüm. Terminal ve Pro Mod ayrıştırıldı.", "time": "Now"},
+        {"user": "Admin 🦁", "msg": "NEXUS v20.1: Ekran genişletildi, logo düzeltildi.", "time": "Now"},
     ]
 
 THEMES = {
@@ -76,12 +76,27 @@ def calculate_indicators(df):
         "upper_bb": last['upper_bb'], "lower_bb": last['lower_bb']
     }
 
-# --- 2. CSS ---
+# --- 2. CSS (KOZMETİK DÜZELTMELER BURADA) ---
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
-    .main .block-container {{ max-width: 98vw; padding: 1rem; }}
-    .nexus-panel {{ background-color: #1E1E1E; padding: 10px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; }}
+    
+    /* EKRANI TAM YAYMA (%99) */
+    .main .block-container {{
+        max-width: 99vw; 
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }}
+    
+    .nexus-panel {{
+        background-color: #1E1E1E;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        margin-bottom: 10px;
+    }}
     
     /* TABLO */
     .coin-header {{ display: flex; justify-content: space-between; color: gray; font-size: 12px; padding: 5px 10px; font-weight: bold; }}
@@ -92,13 +107,33 @@ st.markdown(f"""
     .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     
-    /* LOGO */
-    .logo-container {{ display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; flex-wrap: nowrap !important; overflow: hidden; }}
-    .logo-img {{ width: 50px; height: auto; margin-right: 10px; border-radius: 10px; flex-shrink: 0; }}
-    .logo-text {{ color: {st.session_state.theme_color}; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 1px; line-height: 1; white-space: nowrap !important; }}
+    /* LOGO DÜZELTMESİ (S HARFİ İÇİN) */
+    .logo-container {{
+        display: flex;
+        align-items: center; 
+        justify-content: flex-start;
+        margin-bottom: 15px;
+        white-space: nowrap; /* Alt satıra geçme */
+        /* overflow: hidden;  <-- BU KALDIRILDI, S HARFİ ARTIK GÖRÜNECEK */
+    }}
+    .logo-img {{
+        width: 55px; /* Biraz büyütüldü */
+        height: auto;
+        margin-right: 12px;
+        border-radius: 10px;
+        flex-shrink: 0; 
+    }}
+    .logo-text {{
+        color: {st.session_state.theme_color};
+        margin: 0;
+        font-size: 24px; /* Okunabilirlik için ideal boyut */
+        font-weight: 900;
+        letter-spacing: 1px;
+        line-height: 1;
+    }}
     
-    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; text-transform: uppercase; }}
-    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; }}
+    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; font-size: 13px; text-transform: uppercase; padding: 8px 0px; }}
+    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; font-size: 14px; font-weight: 900; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -177,16 +212,6 @@ def get_ohlc_data(coin_id, currency, days):
         return df
     except: return pd.DataFrame()
 
-@st.cache_data(ttl=600)
-def get_news(topic):
-    try:
-        import xml.etree.ElementTree as ET
-        rss_url = f"https://news.google.com/rss/search?q={topic}&hl=tr&gl=TR&ceid=TR:tr"
-        r = requests.get(rss_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-        root = ET.fromstring(r.content)
-        return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:10]]
-    except: return []
-
 # --- GRAFİK 1: BASİT (TERMINAL - ZOOM AYARLI) ---
 def create_mini_chart(df, price_change, currency_symbol, height=350):
     fig = go.Figure()
@@ -195,7 +220,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     main_color = '#ea3943' if price_change < 0 else '#16c784'
     fill_color = 'rgba(234, 57, 67, 0.2)' if price_change < 0 else 'rgba(22, 199, 132, 0.2)' 
     
-    # Otomatik Zoom (Düz çizgi sorununu çözer)
+    # Otomatik Zoom
     min_p = df['price'].min()
     max_p = df['price'].max()
     padding = (max_p - min_p) * 0.05 if max_p != min_p else max_p * 0.01
@@ -210,7 +235,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
             side='right', visible=True, 
             gridcolor='rgba(128,128,128,0.1)', color='white', 
             tickprefix=currency_symbol,
-            range=[min_p - padding, max_p + padding] # Y ekseni aralığı
+            range=[min_p - padding, max_p + padding]
         )
     )
     return fig
@@ -237,8 +262,9 @@ def create_pro_chart(df, coin_name, currency_symbol):
     )
     return fig
 
-# --- LAYOUT ---
-layout_cols = [1, 4, 1] if st.session_state.app_mode in ["TERMINAL", "PRO TERMINAL"] else [1, 5]
+# --- LAYOUT AYARI: YAN PANELLER GENİŞLETİLDİ ---
+# Eskiden [1, 4, 1] idi. Şimdi [1.2, 4, 1.2] yaparak yanlara daha çok yer verdik.
+layout_cols = [1.2, 4, 1.2] if st.session_state.app_mode in ["TERMINAL", "PRO TERMINAL"] else [1.5, 5]
 cols = st.columns(layout_cols)
 col_nav = cols[0]
 col_main = cols[1]
@@ -250,7 +276,7 @@ with col_nav:
         if logo_base64:
             st.markdown(f"""<div class="logo-container"><img src="data:image/jpeg;base64,{logo_base64}" class="logo-img"><h1 class="logo-text">NEXUS</h1></div>""", unsafe_allow_html=True)
         else:
-            st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 22px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 24px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
         st.caption("🌐 **MOD**")
@@ -270,6 +296,17 @@ with col_nav:
             analyze_btn = st.button("ANALİZİ BAŞLAT", type="primary")
             st.markdown("---")
             
+            st.caption("🚀 **HIZLI ERİŞİM**")
+            top10_data = get_top10_coins(st.session_state.currency)
+            if top10_data:
+                cols_quick = st.columns(3)
+                for i, coin in enumerate(top10_data[:10]):
+                    if cols_quick[i % 3].button(coin['symbol'].upper(), key=f"qbtn_{coin['id']}"):
+                        st.session_state.selected_coin = coin['id']
+                        st.rerun()
+            else: st.caption("Yükleniyor...")
+
+            st.markdown("---")
             st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün", "1 Ay", "6 Ay"], horizontal=True, label_visibility="collapsed")
             if day_opt == "24 Saat": days_api = "1"
@@ -293,7 +330,7 @@ with col_nav:
 # --- ANA İÇERİK ---
 with col_main:
     
-    # === MOD 1: TERMINAL (KLASİK - BASİT VE HIZLI) ===
+    # === MOD 1: TERMINAL (KLASİK) ===
     if st.session_state.app_mode == "TERMINAL":
         raw_input = st.session_state.selected_coin.lower().strip()
         curr = st.session_state.currency
@@ -317,9 +354,7 @@ with col_main:
                 cl1, cl2 = st.columns([1, 1])
                 cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
-                
                 u_df = get_chart_data(user_coin_id, curr, days_api)
-                # Çakışmayı önlemek için key eklendi
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="chart_term_1")
 
             with c_chart2:
@@ -418,7 +453,6 @@ with col_main:
                 st.markdown("### 📊 Teknik Göstergeler")
                 i1, i2, i3, i4 = st.columns(4)
                 i1.metric("RSI (14)", f"{tech['rsi']:.2f}", tech['rsi_msg'])
-                # Düzeltildi
                 i2.metric("MACD", f"{tech['macd']:.4f}", f"{tech['macd_sig']:.4f}")
                 i3.metric("SMA (20)", f"{tech['sma20']:.2f}", tech['trend'])
                 i4.metric("Bollinger", "Band", f"{tech['upper_bb']:.2f} / {tech['lower_bb']:.2f}")
