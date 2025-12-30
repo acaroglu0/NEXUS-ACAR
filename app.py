@@ -21,7 +21,7 @@ if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'et
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS v19.2: Grafikler düzeltildi, Pro Panel aktif.", "time": "Now"},
+        {"user": "Admin 🦁", "msg": "NEXUS v20.0: Stabil Sürüm. Terminal ve Pro Mod ayrıştırıldı.", "time": "Now"},
     ]
 
 THEMES = {
@@ -195,7 +195,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
     main_color = '#ea3943' if price_change < 0 else '#16c784'
     fill_color = 'rgba(234, 57, 67, 0.2)' if price_change < 0 else 'rgba(22, 199, 132, 0.2)' 
     
-    # OTOMATİK ZOOM HESABI (DÜZ ÇİZGİ SORUNUNU ÇÖZER)
+    # Otomatik Zoom (Düz çizgi sorununu çözer)
     min_p = df['price'].min()
     max_p = df['price'].max()
     padding = (max_p - min_p) * 0.05 if max_p != min_p else max_p * 0.01
@@ -210,7 +210,7 @@ def create_mini_chart(df, price_change, currency_symbol, height=350):
             side='right', visible=True, 
             gridcolor='rgba(128,128,128,0.1)', color='white', 
             tickprefix=currency_symbol,
-            range=[min_p - padding, max_p + padding] # BU SATIR KRİTİK
+            range=[min_p - padding, max_p + padding] # Y ekseni aralığı
         )
     )
     return fig
@@ -293,7 +293,7 @@ with col_nav:
 # --- ANA İÇERİK ---
 with col_main:
     
-    # === MOD 1: TERMINAL (KLASİK) ===
+    # === MOD 1: TERMINAL (KLASİK - BASİT VE HIZLI) ===
     if st.session_state.app_mode == "TERMINAL":
         raw_input = st.session_state.selected_coin.lower().strip()
         curr = st.session_state.currency
@@ -317,9 +317,10 @@ with col_main:
                 cl1, cl2 = st.columns([1, 1])
                 cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
-                # Basit Çizgi Grafik (Zoom Ayarlı)
+                
                 u_df = get_chart_data(user_coin_id, curr, days_api)
-                st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
+                # Çakışmayı önlemek için key eklendi
+                st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="chart_term_1")
 
             with c_chart2:
                 b_change = btc_data.get(f'{curr}_24h_change', 0)
@@ -328,14 +329,14 @@ with col_main:
                 cr1.markdown(f"<h2 style='margin:0;'>BITCOIN</h2>", unsafe_allow_html=True)
                 cr2.markdown(f"<h3 style='text-align:right; color:{b_color}; margin:0;'>{curr_sym}{btc_data[curr]:,.2f} (%{b_change:.2f})</h3>", unsafe_allow_html=True)
                 b_df = get_chart_data("bitcoin", curr, days_api)
-                st.plotly_chart(create_mini_chart(b_df, b_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
+                st.plotly_chart(create_mini_chart(b_df, b_change, curr_sym), use_container_width=True, config={'displayModeBar': False}, key="chart_term_2")
 
             c_bot1, c_bot2, c_bot3 = st.columns(3)
             with c_bot1:
                 with st.container(border=True):
                     st.caption(f"🤖 **NEXUS AI SOR**")
-                    user_q = st.text_input("Soru:", placeholder="Destek neresi?", label_visibility="collapsed")
-                    if st.button("GÖNDER", key="ai_ask"):
+                    user_q = st.text_input("Soru:", placeholder="Destek neresi?", label_visibility="collapsed", key="q_term")
+                    if st.button("GÖNDER", key="btn_term"):
                          if not st.secrets.get("GEMINI_API_KEY"): st.error("API Key Yok")
                          else:
                              with st.spinner(".."):
@@ -408,16 +409,16 @@ with col_main:
             tech = calculate_indicators(line_df) 
             
             if not ohlc_df.empty:
-                st.plotly_chart(create_pro_chart(ohlc_df, user_coin_id.upper(), curr_sym), use_container_width=True)
+                st.plotly_chart(create_pro_chart(ohlc_df, user_coin_id.upper(), curr_sym), use_container_width=True, key="chart_pro_candle")
             else:
                 st.warning("Mum verisi alınamadı, Çizgi grafik gösteriliyor.")
-                st.plotly_chart(create_mini_chart(line_df, u_change, curr_sym, height=500), use_container_width=True)
+                st.plotly_chart(create_mini_chart(line_df, u_change, curr_sym, height=500), use_container_width=True, key="chart_pro_line")
             
             if tech:
                 st.markdown("### 📊 Teknik Göstergeler")
                 i1, i2, i3, i4 = st.columns(4)
                 i1.metric("RSI (14)", f"{tech['rsi']:.2f}", tech['rsi_msg'])
-                # HATA DÜZELTİLDİ: Tırnak işaretleri eklendi
+                # Düzeltildi
                 i2.metric("MACD", f"{tech['macd']:.4f}", f"{tech['macd_sig']:.4f}")
                 i3.metric("SMA (20)", f"{tech['sma20']:.2f}", tech['trend'])
                 i4.metric("Bollinger", "Band", f"{tech['upper_bb']:.2f} / {tech['lower_bb']:.2f}")
@@ -458,7 +459,7 @@ with col_main:
         else:
             st.warning("Veri yükleniyor...")
 
-    # === MOD 3: PORTAL (HABER & LİSTE) ===
+    # === MOD 3: PORTAL (CMC LİSTESİ) ===
     else:
         st.markdown(f"<h3 style='color:{st.session_state.theme_color}'>🏆 TOP 10 PIYASA</h3>", unsafe_allow_html=True)
         top10 = get_top10_coins(st.session_state.currency)
@@ -515,8 +516,8 @@ with col_main:
         with c_social:
             st.subheader("💬 TOPLULUK")
             with st.container(border=True):
-                user_msg = st.text_input("Yorum Yaz:", placeholder="Düşüncelerin...")
-                if st.button("PAYLAŞ", use_container_width=True):
+                user_msg = st.text_input("Yorum Yaz:", placeholder="Düşüncelerin...", key="msg_portal")
+                if st.button("PAYLAŞ", use_container_width=True, key="btn_portal"):
                     if user_msg:
                         st.session_state.posts.insert(0, {"user": "Misafir", "msg": user_msg, "time": datetime.datetime.now().strftime("%H:%M")})
                         st.rerun()
@@ -524,7 +525,7 @@ with col_main:
                 for p in st.session_state.posts:
                     st.markdown(f"""<div class="social-card"><span style="color:{st.session_state.theme_color}; font-weight:bold;">@{p['user']}</span> <span style="color:gray; font-size:10px;">{p['time']}</span><br>{p['msg']}</div>""", unsafe_allow_html=True)
 
-# --- SAĞ PANEL (Sadece Terminal ve Pro Modda) ---
+# --- SAĞ PANEL ---
 if col_right and st.session_state.app_mode != "PORTAL":
     with col_right:
         with st.container(border=True):
