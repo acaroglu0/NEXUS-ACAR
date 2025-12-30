@@ -21,7 +21,7 @@ if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'et
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS v19.0 Yayında: Terminal, Pro Panel ve Portal ayrıldı.", "time": "Now"},
+        {"user": "Admin 🦁", "msg": "NEXUS v19.1: Pro Panel aktif ve hatalar giderildi.", "time": "Now"},
     ]
 
 THEMES = {
@@ -111,7 +111,7 @@ st.markdown(f"""
     .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     
-    /* LOGO DÜZELTMESİ (SENİN ONAYLADIĞIN HALİ) */
+    /* LOGO DÜZELTMESİ */
     .logo-container {{
         display: flex;
         align-items: center; 
@@ -208,16 +208,24 @@ def get_chart_data(coin_id, currency, days):
 @st.cache_data(ttl=1800)
 def get_ohlc_data(coin_id, currency, days):
     try:
-        # CoinGecko OHLC endpointi sınırlı gün seçenekleri sunar (1/7/14/30/90/180/365/max)
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc?vs_currency={currency}&days={days}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r.status_code != 200: return pd.DataFrame()
         data = r.json()
-        # [time, open, high, low, close]
         df = pd.DataFrame(data, columns=['time', 'open', 'high', 'low', 'close'])
         df['time'] = pd.to_datetime(df['time'], unit='ms')
         return df
     except: return pd.DataFrame()
+
+@st.cache_data(ttl=600)
+def get_news(topic):
+    try:
+        import xml.etree.ElementTree as ET
+        rss_url = f"https://news.google.com/rss/search?q={topic}&hl=tr&gl=TR&ceid=TR:tr"
+        r = requests.get(rss_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+        root = ET.fromstring(r.content)
+        return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:10]]
+    except: return []
 
 # --- GRAFİK 1: BASİT (TERMINAL) ---
 def create_mini_chart(df, price_change, currency_symbol, height=350):
@@ -277,7 +285,6 @@ with col_nav:
             st.rerun()
         st.markdown("---")
         
-        # Sadece Terminal ve Pro'da arama var
         if st.session_state.app_mode in ["TERMINAL", "PRO TERMINAL"]:
             st.caption("🔍 **KRİPTO SEÇ**")
             coin_input = st.text_input("Coin Ara:", st.session_state.selected_coin, label_visibility="collapsed")
@@ -334,7 +341,6 @@ with col_main:
                 cl1, cl2 = st.columns([1, 1])
                 cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
-                # Basit Çizgi Grafik
                 u_df = get_chart_data(user_coin_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
 
@@ -385,7 +391,6 @@ with col_main:
                          try:
                              model = get_model()
                              price_now = user_data[curr]
-                             # BASİT ANALİZ
                              simple_prompt = f"""
                              Coin: {user_coin_id.upper()}, Fiyat: {price_now} {curr.upper()}.
                              Yatırımcı için kısa, net ve anlaşılır bir durum özeti geç. Çok teknik terim kullanma. Yön ne tarafa?
@@ -422,9 +427,7 @@ with col_main:
             c2.markdown(f"<h3 style='color:{u_color}'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
             c3.metric("24s Hacim", f"{curr_sym}{u_vol:,.0f}")
             
-            # GRAFİK: MUM ÇUBUKLARI (OHLC)
             ohlc_df = get_ohlc_data(user_coin_id, curr, days_api)
-            # İndikatör hesabı için line data (yedek/destek)
             line_df = get_chart_data(user_coin_id, curr, days_api)
             tech = calculate_indicators(line_df) 
             
@@ -434,17 +437,15 @@ with col_main:
                 st.warning("Mum verisi alınamadı, Çizgi grafik gösteriliyor.")
                 st.plotly_chart(create_mini_chart(line_df, u_change, curr_sym, height=500), use_container_width=True)
             
-            # TEKNİK GÖSTERGELER
             if tech:
                 st.markdown("### 📊 Teknik Göstergeler")
                 i1, i2, i3, i4 = st.columns(4)
                 i1.metric("RSI (14)", f"{tech['rsi']:.2f}", tech['rsi_msg'])
-                # Hata düzeltildi: f-string içine alındı
+                # HATA BURADAYDI, DÜZELTİLDİ:
                 i2.metric("MACD", f"{tech['macd']:.4f}", f"{tech['macd_sig']:.4f}")
                 i3.metric("SMA (20)", f"{tech['sma20']:.2f}", tech['trend'])
                 i4.metric("Bollinger", "Band", f"{tech['upper_bb']:.2f} / {tech['lower_bb']:.2f}")
             
-            # UZMAN ANALİZ BUTONU
             if analyze_btn:
                 st.markdown("---")
                 st.subheader(f"🦁 NEXUS PRO: Advanced Market Analysis")
@@ -455,7 +456,6 @@ with col_main:
                         try:
                             model = get_model()
                             price_now = user_data[curr]
-                            # PROMPT: John Murphy / Scott Carney
                             expert_prompt = f"""
                             Sen John Murphy ve Scott Carney'in öğretileriyle donatılmış, Elliott Dalgalarını sayabilen, Harmonik formasyonları görebilen elit bir "Teknik Analist"sin.
                             DİL: {st.session_state.language}
@@ -482,7 +482,7 @@ with col_main:
         else:
             st.warning("Veri yükleniyor...")
 
-    # === MOD 3: PORTAL (HABER & LİSTE) ===
+    # === MOD 3: PORTAL ===
     else:
         st.markdown(f"<h3 style='color:{st.session_state.theme_color}'>🏆 TOP 10 PIYASA</h3>", unsafe_allow_html=True)
         top10 = get_top10_coins(st.session_state.currency)
