@@ -21,7 +21,7 @@ if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'et
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS v19.0: 3 Farklı Mod Yayında! (Terminal, Pro, Portal)", "time": "Now"},
+        {"user": "Admin 🦁", "msg": "NEXUS v19.0 Yayında: Terminal, Pro Panel ve Portal ayrıldı.", "time": "Now"},
     ]
 
 THEMES = {
@@ -41,39 +41,43 @@ def get_base64_of_bin_file(bin_file):
 logo_path = "logo.jpeg"
 logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else None
 
-# --- TEKNİK ANALİZ MOTORU ---
+# --- GELİŞMİŞ TEKNİK ANALİZ MOTORU ---
 def calculate_indicators(df):
     if df.empty or len(df) < 26: return None
     
+    # RSI
     delta = df['price'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     df['rsi'] = 100 - (100 / (1 + rs))
+    
+    # SMA 20 & 50
     df['sma20'] = df['price'].rolling(window=20).mean()
+    df['sma50'] = df['price'].rolling(window=50).mean()
     
     # Bollinger
-    df['std_dev'] = df['price'].rolling(window=20).std()
-    df['upper_bb'] = df['sma20'] + (df['std_dev'] * 2)
-    df['lower_bb'] = df['sma20'] - (df['std_dev'] * 2)
+    df['std'] = df['price'].rolling(window=20).std()
+    df['upper_bb'] = df['sma20'] + (df['std'] * 2)
+    df['lower_bb'] = df['sma20'] - (df['std'] * 2)
     
     # MACD
     exp1 = df['price'].ewm(span=12, adjust=False).mean()
     exp2 = df['price'].ewm(span=26, adjust=False).mean()
     df['macd'] = exp1 - exp2
     df['signal'] = df['macd'].ewm(span=9, adjust=False).mean()
-
+    
     last = df.iloc[-1]
     
+    # Yorumlar
     trend = "YÜKSELİŞ" if last['price'] > last['sma20'] else "DÜŞÜŞ"
-    rsi_status = "NÖTR"
-    if last['rsi'] > 70: rsi_status = "AŞIRI ALIM"
-    elif last['rsi'] < 30: rsi_status = "AŞIRI SATIM"
+    rsi_msg = "AŞIRI ALIM" if last['rsi'] > 70 else "AŞIRI SATIM" if last['rsi'] < 30 else "NÖTR"
+    macd_msg = "AL" if last['macd'] > last['signal'] else "SAT"
     
     return {
-        "rsi": last['rsi'], "rsi_msg": rsi_status, 
+        "rsi": last['rsi'], "rsi_msg": rsi_msg,
         "trend": trend, "sma20": last['sma20'],
-        "macd": last['macd'], "macd_sig": last['signal'],
+        "macd": last['macd'], "macd_sig": last['signal'], "macd_msg": macd_msg,
         "upper_bb": last['upper_bb'], "lower_bb": last['lower_bb']
     }
 
@@ -81,10 +85,24 @@ def calculate_indicators(df):
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
-    .main .block-container {{ max-width: 98vw; padding: 1rem; }}
-    .nexus-panel {{ background-color: #1E1E1E; padding: 10px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; }}
     
-    /* TABLO */
+    .block-container {{
+        padding-top: 2rem;
+        padding-bottom: 2rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        max-width: 100%;
+    }}
+    
+    .nexus-panel {{
+        background-color: #1E1E1E;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #333;
+        margin-bottom: 10px;
+    }}
+    
+    /* CMC TARZI TABLO */
     .coin-header {{ display: flex; justify-content: space-between; color: gray; font-size: 12px; padding: 5px 10px; font-weight: bold; }}
     .coin-row {{ display: flex; align-items: center; justify-content: space-between; background-color: #151515; border-bottom: 1px solid #333; padding: 12px 10px; border-radius: 6px; margin-bottom: 5px; }}
     .coin-row:hover {{ background-color: #252525; }}
@@ -93,13 +111,34 @@ st.markdown(f"""
     .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     
-    /* LOGO */
-    .logo-container {{ display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; flex-wrap: nowrap !important; overflow: hidden; }}
-    .logo-img {{ width: 50px; height: auto; margin-right: 10px; border-radius: 10px; flex-shrink: 0; }}
-    .logo-text {{ color: {st.session_state.theme_color}; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 1px; line-height: 1; white-space: nowrap !important; }}
+    /* LOGO DÜZELTMESİ (SENİN ONAYLADIĞIN HALİ) */
+    .logo-container {{
+        display: flex;
+        align-items: center; 
+        justify-content: flex-start;
+        margin-bottom: 15px;
+        flex-wrap: nowrap !important;
+        overflow: hidden; 
+    }}
+    .logo-img {{
+        width: 50px; 
+        height: auto;
+        margin-right: 10px;
+        border-radius: 10px;
+        flex-shrink: 0; 
+    }}
+    .logo-text {{
+        color: {st.session_state.theme_color};
+        margin: 0;
+        font-size: 22px; 
+        font-weight: 900;
+        letter-spacing: 1px;
+        line-height: 1;
+        white-space: nowrap !important;
+    }}
     
-    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; text-transform: uppercase; }}
-    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; }}
+    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; font-size: 13px; text-transform: uppercase; padding: 8px 0px; }}
+    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; font-size: 14px; font-weight: 900; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -168,8 +207,8 @@ def get_chart_data(coin_id, currency, days):
 # --- PRO İÇİN OHLC (MUM) VERİSİ ---
 @st.cache_data(ttl=1800)
 def get_ohlc_data(coin_id, currency, days):
-    # CoinGecko OHLC endpointi (1/7/14/30/90/180/365/max)
     try:
+        # CoinGecko OHLC endpointi sınırlı gün seçenekleri sunar (1/7/14/30/90/180/365/max)
         url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc?vs_currency={currency}&days={days}"
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
         if r.status_code != 200: return pd.DataFrame()
@@ -179,16 +218,6 @@ def get_ohlc_data(coin_id, currency, days):
         df['time'] = pd.to_datetime(df['time'], unit='ms')
         return df
     except: return pd.DataFrame()
-
-@st.cache_data(ttl=600)
-def get_news(topic):
-    try:
-        import xml.etree.ElementTree as ET
-        rss_url = f"https://news.google.com/rss/search?q={topic}&hl=tr&gl=TR&ceid=TR:tr"
-        r = requests.get(rss_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-        root = ET.fromstring(r.content)
-        return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:10]]
-    except: return []
 
 # --- GRAFİK 1: BASİT (TERMINAL) ---
 def create_mini_chart(df, price_change, currency_symbol, height=350):
@@ -224,13 +253,14 @@ def create_pro_chart(df, coin_name, currency_symbol):
     return fig
 
 # --- LAYOUT ---
+# Sadece Terminal veya Pro modunda sağ panel açık
 layout_cols = [1, 4, 1] if st.session_state.app_mode in ["TERMINAL", "PRO TERMINAL"] else [1, 5]
 cols = st.columns(layout_cols)
 col_nav = cols[0]
 col_main = cols[1]
 col_right = cols[2] if len(cols) > 2 else None
 
-# --- SOL PANEL ---
+# --- SOL PANEL (NAVİGASYON) ---
 with col_nav:
     with st.container(border=True):
         if logo_base64:
@@ -239,16 +269,15 @@ with col_nav:
             st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 22px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
-        # NAVİGASYON (3 MODLU)
+        # --- MOD SEÇİCİ ---
         st.caption("🌐 **MOD**")
-        # Radio buton yerine selectbox kullanabiliriz alan darsa, ama radio iyi
         mode_select = st.radio("Mod:", ["TERMINAL", "PRO TERMINAL", "PORTAL"], label_visibility="collapsed")
         if mode_select != st.session_state.app_mode:
             st.session_state.app_mode = mode_select
             st.rerun()
-
         st.markdown("---")
         
+        # Sadece Terminal ve Pro'da arama var
         if st.session_state.app_mode in ["TERMINAL", "PRO TERMINAL"]:
             st.caption("🔍 **KRİPTO SEÇ**")
             coin_input = st.text_input("Coin Ara:", st.session_state.selected_coin, label_visibility="collapsed")
@@ -260,7 +289,6 @@ with col_nav:
             
             st.caption("⏳ **SÜRE**")
             day_opt = st.radio("Süre:", ["24 Saat", "7 Gün", "1 Ay", "6 Ay"], horizontal=True, label_visibility="collapsed")
-            
             if day_opt == "24 Saat": days_api = "1"
             elif day_opt == "7 Gün": days_api = "7"
             elif day_opt == "1 Ay": days_api = "30"
@@ -282,7 +310,7 @@ with col_nav:
 # --- ANA İÇERİK ---
 with col_main:
     
-    # === MOD 1: TERMINAL (KLASİK - HIZLI - BASİT) ===
+    # === MOD 1: TERMINAL (KLASİK) ===
     if st.session_state.app_mode == "TERMINAL":
         raw_input = st.session_state.selected_coin.lower().strip()
         curr = st.session_state.currency
@@ -300,18 +328,14 @@ with col_main:
         
         if user_data and btc_data:
             c_chart1, c_chart2 = st.columns(2)
-            
             with c_chart1:
                 u_change = user_data.get(f'{curr}_24h_change', 0)
                 u_color = "#ea3943" if u_change < 0 else "#16c784"
                 cl1, cl2 = st.columns([1, 1])
                 cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
-                
-                # Grafik verisini al (Line Chart)
+                # Basit Çizgi Grafik
                 u_df = get_chart_data(user_coin_id, curr, days_api)
-                technical_data = calculate_indicators(u_df) 
-                
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
 
             with c_chart2:
@@ -337,11 +361,9 @@ with col_main:
                                      r = m.generate_content(f"Coin: {user_coin_id}. Fiyat: {user_data[curr]}. Soru: {user_q}. Kısa cevapla.")
                                      st.info(r.text)
                                  except: pass
-
             with c_bot2:
                 with st.container(border=True):
                     st.markdown("""<div class="box-content"><div class="ad-placeholder">REKLAM ALANI</div></div>""", unsafe_allow_html=True)
-
             with c_bot3:
                 with st.container(border=True):
                     global_data = get_global_data()
@@ -363,7 +385,7 @@ with col_main:
                          try:
                              model = get_model()
                              price_now = user_data[curr]
-                             # BASİT ANALİZ PROMPTU
+                             # BASİT ANALİZ
                              simple_prompt = f"""
                              Coin: {user_coin_id.upper()}, Fiyat: {price_now} {curr.upper()}.
                              Yatırımcı için kısa, net ve anlaşılır bir durum özeti geç. Çok teknik terim kullanma. Yön ne tarafa?
@@ -375,7 +397,7 @@ with col_main:
         else:
             st.warning(f"⚠️ Veri alınamadı (Limit/Hata). Lütfen 1 dakika bekleyin.")
 
-    # === MOD 2: PRO TERMINAL (YENİ - PROFESYONEL) ===
+    # === MOD 2: PRO TERMINAL (YENİ - GELİŞMİŞ) ===
     elif st.session_state.app_mode == "PRO TERMINAL":
         raw_input = st.session_state.selected_coin.lower().strip()
         curr = st.session_state.currency
@@ -390,23 +412,21 @@ with col_main:
                 user_data = get_coin_data(user_coin_id, curr)
         
         if user_data:
-            # ÜST BİLGİ ŞERİDİ
+            # Üst Bilgi
             u_change = user_data.get(f'{curr}_24h_change', 0)
             u_vol = user_data.get(f'{curr}_24h_vol', 0)
             u_color = "#ea3943" if u_change < 0 else "#16c784"
             
-            c_info1, c_info2, c_info3, c_info4 = st.columns(4)
-            c_info1.markdown(f"## {user_coin_id.upper()}")
-            c_info2.markdown(f"<h3 style='color:{u_color}'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
-            c_info3.metric("24s Hacim", f"{curr_sym}{u_vol:,.0f}")
+            c1, c2, c3 = st.columns(3)
+            c1.markdown(f"## {user_coin_id.upper()}")
+            c2.markdown(f"<h3 style='color:{u_color}'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
+            c3.metric("24s Hacim", f"{curr_sym}{u_vol:,.0f}")
             
-            # CHART & TECH DATA
-            # Pro modda OHLC (Mum) verisi çekmeye çalışıyoruz
+            # GRAFİK: MUM ÇUBUKLARI (OHLC)
             ohlc_df = get_ohlc_data(user_coin_id, curr, days_api)
-            
-            # Eğer OHLC çekemezse normal line chart verisini alıp hesaplama yapalım
+            # İndikatör hesabı için line data (yedek/destek)
             line_df = get_chart_data(user_coin_id, curr, days_api)
-            tech = calculate_indicators(line_df) # İndikatörler line df'den hesaplanır
+            tech = calculate_indicators(line_df) 
             
             if not ohlc_df.empty:
                 st.plotly_chart(create_pro_chart(ohlc_df, user_coin_id.upper(), curr_sym), use_container_width=True)
@@ -414,16 +434,17 @@ with col_main:
                 st.warning("Mum verisi alınamadı, Çizgi grafik gösteriliyor.")
                 st.plotly_chart(create_mini_chart(line_df, u_change, curr_sym, height=500), use_container_width=True)
             
-            # İNDİKATÖR PANELİ (GÖRSEL)
+            # TEKNİK GÖSTERGELER
             if tech:
                 st.markdown("### 📊 Teknik Göstergeler")
                 i1, i2, i3, i4 = st.columns(4)
                 i1.metric("RSI (14)", f"{tech['rsi']:.2f}", tech['rsi_msg'])
-                i2.metric("MACD", f"{tech['macd']:.4f}", tech['macd_sig']:.4f)
+                # Hata düzeltildi: f-string içine alındı
+                i2.metric("MACD", f"{tech['macd']:.4f}", f"{tech['macd_sig']:.4f}")
                 i3.metric("SMA (20)", f"{tech['sma20']:.2f}", tech['trend'])
                 i4.metric("Bollinger", "Band", f"{tech['upper_bb']:.2f} / {tech['lower_bb']:.2f}")
             
-            # PROFESYONEL ANALİZ BUTONU
+            # UZMAN ANALİZ BUTONU
             if analyze_btn:
                 st.markdown("---")
                 st.subheader(f"🦁 NEXUS PRO: Advanced Market Analysis")
@@ -434,8 +455,7 @@ with col_main:
                         try:
                             model = get_model()
                             price_now = user_data[curr]
-                            
-                            # --- EXPERT PROMPT (Senin istediğin John Murphy / Scott Carney metni) ---
+                            # PROMPT: John Murphy / Scott Carney
                             expert_prompt = f"""
                             Sen John Murphy ve Scott Carney'in öğretileriyle donatılmış, Elliott Dalgalarını sayabilen, Harmonik formasyonları görebilen elit bir "Teknik Analist"sin.
                             DİL: {st.session_state.language}
@@ -445,7 +465,7 @@ with col_main:
                             * Fiyat: {price_now} {curr.upper()}
                             * RSI (14): {tech['rsi']:.2f} ({tech['rsi_msg']})
                             * Trend (SMA 20): {tech['trend']}
-                            * MACD: {tech['macd']:.4f} (Sinyal: {tech['macd_sig']:.4f})
+                            * MACD: {tech['macd']:.4f} (Sinyal: {tech['macd_sig']:.4f} -> {tech['macd_msg']})
                             * Bollinger: Üst {tech['upper_bb']:.2f} / Alt {tech['lower_bb']:.2f}
                             
                             **ANALİZ GÖREVİN (4 DİSİPLİN):**
@@ -459,11 +479,10 @@ with col_main:
                             res = model.generate_content(expert_prompt)
                             st.markdown(res.text, unsafe_allow_html=True)
                         except: st.error("Bağlantı hatası.")
-
         else:
             st.warning("Veri yükleniyor...")
 
-    # === MOD 3: PORTAL (CMC LİSTESİ) ===
+    # === MOD 3: PORTAL (HABER & LİSTE) ===
     else:
         st.markdown(f"<h3 style='color:{st.session_state.theme_color}'>🏆 TOP 10 PIYASA</h3>", unsafe_allow_html=True)
         top10 = get_top10_coins(st.session_state.currency)
