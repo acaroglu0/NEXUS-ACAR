@@ -21,7 +21,7 @@ if 'selected_coin' not in st.session_state: st.session_state.selected_coin = 'et
 
 if 'posts' not in st.session_state: 
     st.session_state.posts = [
-        {"user": "Admin 🦁", "msg": "NEXUS v19.1: Pro Panel aktif ve hatalar giderildi.", "time": "Now"},
+        {"user": "Admin 🦁", "msg": "NEXUS v19.2: Grafikler düzeltildi, Pro Panel aktif.", "time": "Now"},
     ]
 
 THEMES = {
@@ -41,20 +41,16 @@ def get_base64_of_bin_file(bin_file):
 logo_path = "logo.jpeg"
 logo_base64 = get_base64_of_bin_file(logo_path) if os.path.exists(logo_path) else None
 
-# --- GELİŞMİŞ TEKNİK ANALİZ MOTORU ---
+# --- TEKNİK ANALİZ MOTORU ---
 def calculate_indicators(df):
     if df.empty or len(df) < 26: return None
     
-    # RSI
     delta = df['price'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
     rs = gain / loss
     df['rsi'] = 100 - (100 / (1 + rs))
-    
-    # SMA 20 & 50
     df['sma20'] = df['price'].rolling(window=20).mean()
-    df['sma50'] = df['price'].rolling(window=50).mean()
     
     # Bollinger
     df['std'] = df['price'].rolling(window=20).std()
@@ -69,7 +65,6 @@ def calculate_indicators(df):
     
     last = df.iloc[-1]
     
-    # Yorumlar
     trend = "YÜKSELİŞ" if last['price'] > last['sma20'] else "DÜŞÜŞ"
     rsi_msg = "AŞIRI ALIM" if last['rsi'] > 70 else "AŞIRI SATIM" if last['rsi'] < 30 else "NÖTR"
     macd_msg = "AL" if last['macd'] > last['signal'] else "SAT"
@@ -85,24 +80,10 @@ def calculate_indicators(df):
 st.markdown(f"""
 <style>
     [data-testid="stSidebar"] {{display: none;}}
+    .main .block-container {{ max-width: 98vw; padding: 1rem; }}
+    .nexus-panel {{ background-color: #1E1E1E; padding: 10px; border-radius: 12px; border: 1px solid #333; margin-bottom: 10px; }}
     
-    .block-container {{
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        max-width: 100%;
-    }}
-    
-    .nexus-panel {{
-        background-color: #1E1E1E;
-        padding: 10px;
-        border-radius: 12px;
-        border: 1px solid #333;
-        margin-bottom: 10px;
-    }}
-    
-    /* CMC TARZI TABLO */
+    /* TABLO */
     .coin-header {{ display: flex; justify-content: space-between; color: gray; font-size: 12px; padding: 5px 10px; font-weight: bold; }}
     .coin-row {{ display: flex; align-items: center; justify-content: space-between; background-color: #151515; border-bottom: 1px solid #333; padding: 12px 10px; border-radius: 6px; margin-bottom: 5px; }}
     .coin-row:hover {{ background-color: #252525; }}
@@ -111,34 +92,13 @@ st.markdown(f"""
     .price-col {{ width: 30%; text-align: right; font-family: monospace; font-weight: bold; color: white; }}
     .stat-col {{ width: 20%; text-align: right; font-size: 14px; }}
     
-    /* LOGO DÜZELTMESİ */
-    .logo-container {{
-        display: flex;
-        align-items: center; 
-        justify-content: flex-start;
-        margin-bottom: 15px;
-        flex-wrap: nowrap !important;
-        overflow: hidden; 
-    }}
-    .logo-img {{
-        width: 50px; 
-        height: auto;
-        margin-right: 10px;
-        border-radius: 10px;
-        flex-shrink: 0; 
-    }}
-    .logo-text {{
-        color: {st.session_state.theme_color};
-        margin: 0;
-        font-size: 22px; 
-        font-weight: 900;
-        letter-spacing: 1px;
-        line-height: 1;
-        white-space: nowrap !important;
-    }}
+    /* LOGO */
+    .logo-container {{ display: flex; align-items: center; justify-content: flex-start; margin-bottom: 15px; flex-wrap: nowrap !important; overflow: hidden; }}
+    .logo-img {{ width: 50px; height: auto; margin-right: 10px; border-radius: 10px; flex-shrink: 0; }}
+    .logo-text {{ color: {st.session_state.theme_color}; margin: 0; font-size: 22px; font-weight: 900; letter-spacing: 1px; line-height: 1; white-space: nowrap !important; }}
     
-    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; font-size: 13px; text-transform: uppercase; padding: 8px 0px; }}
-    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; font-size: 14px; font-weight: 900; }}
+    div.stButton > button {{ width: 100%; border-radius: 8px; font-weight: 700; text-transform: uppercase; }}
+    div.stButton > button[kind="primary"] {{ background-color: {st.session_state.theme_color}; color: black; border: none; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -227,14 +187,32 @@ def get_news(topic):
         return [{"title": i.find("title").text, "link": i.find("link").text} for i in root.findall(".//item")[:10]]
     except: return []
 
-# --- GRAFİK 1: BASİT (TERMINAL) ---
+# --- GRAFİK 1: BASİT (TERMINAL - ZOOM AYARLI) ---
 def create_mini_chart(df, price_change, currency_symbol, height=350):
     fig = go.Figure()
     if df.empty: return fig
-    color = '#ea3943' if price_change < 0 else '#16c784'
-    fill = 'rgba(234, 57, 67, 0.2)' if price_change < 0 else 'rgba(22, 199, 132, 0.2)' 
-    fig.add_trace(go.Scatter(x=df['time'], y=df['price'], mode='lines', line=dict(color=color, width=2), fill='tozeroy', fillcolor=fill))
-    fig.update_layout(height=height, margin=dict(l=0, r=0, t=10, b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', xaxis=dict(visible=False), yaxis=dict(side='right', visible=True, gridcolor='rgba(128,128,128,0.1)', tickprefix=currency_symbol))
+    
+    main_color = '#ea3943' if price_change < 0 else '#16c784'
+    fill_color = 'rgba(234, 57, 67, 0.2)' if price_change < 0 else 'rgba(22, 199, 132, 0.2)' 
+    
+    # OTOMATİK ZOOM HESABI (DÜZ ÇİZGİ SORUNUNU ÇÖZER)
+    min_p = df['price'].min()
+    max_p = df['price'].max()
+    padding = (max_p - min_p) * 0.05 if max_p != min_p else max_p * 0.01
+    
+    fig.add_trace(go.Scatter(x=df['time'], y=df['price'], mode='lines', line=dict(color=main_color, width=2), fill='tozeroy', fillcolor=fill_color))
+    
+    fig.update_layout(
+        height=height, margin=dict(l=0, r=0, t=10, b=0), 
+        paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', 
+        xaxis=dict(visible=False), 
+        yaxis=dict(
+            side='right', visible=True, 
+            gridcolor='rgba(128,128,128,0.1)', color='white', 
+            tickprefix=currency_symbol,
+            range=[min_p - padding, max_p + padding] # BU SATIR KRİTİK
+        )
+    )
     return fig
 
 # --- GRAFİK 2: PRO (MUM ÇUBUKLARI) ---
@@ -242,7 +220,6 @@ def create_pro_chart(df, coin_name, currency_symbol):
     fig = go.Figure()
     if df.empty: return fig
     
-    # Mum Grafiği
     fig.add_trace(go.Candlestick(
         x=df['time'],
         open=df['open'], high=df['high'],
@@ -261,14 +238,13 @@ def create_pro_chart(df, coin_name, currency_symbol):
     return fig
 
 # --- LAYOUT ---
-# Sadece Terminal veya Pro modunda sağ panel açık
 layout_cols = [1, 4, 1] if st.session_state.app_mode in ["TERMINAL", "PRO TERMINAL"] else [1, 5]
 cols = st.columns(layout_cols)
 col_nav = cols[0]
 col_main = cols[1]
 col_right = cols[2] if len(cols) > 2 else None
 
-# --- SOL PANEL (NAVİGASYON) ---
+# --- SOL PANEL ---
 with col_nav:
     with st.container(border=True):
         if logo_base64:
@@ -277,12 +253,12 @@ with col_nav:
             st.markdown(f"<h1 style='color: {st.session_state.theme_color}; text-align: center; margin:0; font-size: 22px;'>🦁 NEXUS</h1>", unsafe_allow_html=True)
         st.markdown("---")
         
-        # --- MOD SEÇİCİ ---
         st.caption("🌐 **MOD**")
         mode_select = st.radio("Mod:", ["TERMINAL", "PRO TERMINAL", "PORTAL"], label_visibility="collapsed")
         if mode_select != st.session_state.app_mode:
             st.session_state.app_mode = mode_select
             st.rerun()
+
         st.markdown("---")
         
         if st.session_state.app_mode in ["TERMINAL", "PRO TERMINAL"]:
@@ -341,6 +317,7 @@ with col_main:
                 cl1, cl2 = st.columns([1, 1])
                 cl1.markdown(f"<h2 style='margin:0;'>{user_coin_id.upper()}</h2>", unsafe_allow_html=True)
                 cl2.markdown(f"<h3 style='text-align:right; color:{u_color}; margin:0;'>{curr_sym}{user_data[curr]:,.2f} (%{u_change:.2f})</h3>", unsafe_allow_html=True)
+                # Basit Çizgi Grafik (Zoom Ayarlı)
                 u_df = get_chart_data(user_coin_id, curr, days_api)
                 st.plotly_chart(create_mini_chart(u_df, u_change, curr_sym), use_container_width=True, config={'displayModeBar': False})
 
@@ -417,7 +394,6 @@ with col_main:
                 user_data = get_coin_data(user_coin_id, curr)
         
         if user_data:
-            # Üst Bilgi
             u_change = user_data.get(f'{curr}_24h_change', 0)
             u_vol = user_data.get(f'{curr}_24h_vol', 0)
             u_color = "#ea3943" if u_change < 0 else "#16c784"
@@ -441,7 +417,7 @@ with col_main:
                 st.markdown("### 📊 Teknik Göstergeler")
                 i1, i2, i3, i4 = st.columns(4)
                 i1.metric("RSI (14)", f"{tech['rsi']:.2f}", tech['rsi_msg'])
-                # HATA BURADAYDI, DÜZELTİLDİ:
+                # HATA DÜZELTİLDİ: Tırnak işaretleri eklendi
                 i2.metric("MACD", f"{tech['macd']:.4f}", f"{tech['macd_sig']:.4f}")
                 i3.metric("SMA (20)", f"{tech['sma20']:.2f}", tech['trend'])
                 i4.metric("Bollinger", "Band", f"{tech['upper_bb']:.2f} / {tech['lower_bb']:.2f}")
@@ -482,7 +458,7 @@ with col_main:
         else:
             st.warning("Veri yükleniyor...")
 
-    # === MOD 3: PORTAL ===
+    # === MOD 3: PORTAL (HABER & LİSTE) ===
     else:
         st.markdown(f"<h3 style='color:{st.session_state.theme_color}'>🏆 TOP 10 PIYASA</h3>", unsafe_allow_html=True)
         top10 = get_top10_coins(st.session_state.currency)
